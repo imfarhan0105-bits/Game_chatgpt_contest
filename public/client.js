@@ -190,14 +190,37 @@ function makeMiamiHouse(){const T=THREE,g=new T.Group(),palette=['#f2b7a4','#a9d
 function makeHouse(){if(gameState?.map==='muscat')return makeMuscatHouse();if(gameState?.map==='miami')return makeMiamiHouse();const paris=gameState?.map==='paris',T=THREE,g=new T.Group(),wall=mat(paris?'#ada28d':'#625447'),trim=mat(paris?'#6e685b':'#987f61'),dark=mat('#263238'),glass=mat(paris?'#c8bb9d':'#d9a765',.35);box(g,0,1.45,0,2.65,2.9,1.5,wall);box(g,0,2.96,0,2.82,.18,1.68,'#473b32');box(g,0,2.05,.77,.7,1.7,.08,dark);const doorTop=new THREE.Mesh(new THREE.TorusGeometry(.35,.07,8,18,Math.PI),trim);doorTop.position.set(0,2.9,.77);doorTop.rotation.z=Math.PI;g.add(doorTop);for(const side of [-1,1]){box(g,side*.88,1.85,.78,.48,.72,.06,glass);box(g,side*.88,1.85,.82,.55,.055,.08,trim);box(g,side*.88,1.85,.82,.055,.8,.08,trim);box(g,side*.88,1.42,.98,.7,.08,.48,'#4a4036');for(let rail=-2;rail<=2;rail++)box(g,side*.88+rail*.14,1.65,1.16,.025,.42,.025,dark);box(g,side*.88,2.28,.8,.62,.08,.16,'#554536')}box(g,0,3.17,0,2.25,.22,1.25,paris?'#41494c':'#55493c');if(paris){const roof=new T.Mesh(new T.CylinderGeometry(.12,1.58,.85,4),mat('#414b50',.6));roof.rotation.y=Math.PI/4;roof.position.y=3.68;roof.castShadow=true;g.add(roof);box(g,0,3.57,.82,.52,.35,.12,'#364147')}for(let i=-2;i<=2;i++)box(g,i*.4,3.05,.08,.06,.22,.06,trim);const arch=new THREE.Mesh(new THREE.TorusGeometry(.4,.06,8,20,Math.PI),trim);arch.position.set(0,2.86,.78);arch.rotation.z=Math.PI;g.add(arch);const doorLamp=new THREE.PointLight('#ffc47a',2.5,7);doorLamp.position.set(0,2.5,1.7);g.add(doorLamp);const doorLight=new THREE.Mesh(new THREE.SphereGeometry(.1,10,8),new THREE.MeshBasicMaterial({color:'#ffd08b'}));doorLight.position.set(0,2.45,.9);g.add(doorLight);const homeMarker=new T.Group(),homeHalo=new T.Mesh(new T.TorusGeometry(.42,.035,8,24),mat('#73dc98',.38)),homeArrow=new T.Mesh(new T.ConeGeometry(.13,.28,4),mat('#73dc98',.35));homeHalo.rotation.x=Math.PI/2;homeHalo.position.set(0,3.38,.86);homeArrow.position.set(0,3.8,.86);homeArrow.rotation.z=Math.PI;homeMarker.add(homeHalo,homeArrow);homeMarker.visible=false;g.add(homeMarker);g.userData.homeMarker=homeMarker;world3d.add(g);return g}
 function setActorTarget(model,x,z,yaw,backwards=false,local=false){
  const T=THREE,target=new T.Vector3(worldPos(x),0,worldPos(z));
- if(!model.userData.targetPosition){model.userData.targetPosition=target.clone();model.position.copy(target)}
- else{if(target.distanceToSquared(model.userData.targetPosition)>.0004)model.userData.walkingUntil=Date.now()+150;model.userData.targetPosition.copy(target)}
+ const now=performance.now();
+ if(!model.userData.targetPosition){
+  model.userData.targetPosition=target.clone();
+  model.position.copy(target);
+  model.userData.lastTargetTime=now;
+  model.userData.currentSpeed=0;
+ }else{
+  const dDist=target.distanceTo(model.userData.targetPosition);
+  if(dDist>0.015){
+   model.userData.walkingUntil=Date.now()+180;
+   const dtPacket=Math.max(0.015,(now-(model.userData.lastTargetTime||now))/1000);
+   const calculatedSpeed=dDist/dtPacket;
+   model.userData.currentSpeed=model.userData.currentSpeed?(model.userData.currentSpeed*0.35+calculatedSpeed*0.65):calculatedSpeed;
+   model.userData.lastTargetTime=now;
+  }
+  model.userData.targetPosition.copy(target);
+ }
  model.userData.targetYaw=yaw+Math.PI+(backwards?Math.PI:0);model.userData.backwards=backwards;
  if(model.userData.gun)model.userData.gun.rotation.y=local?currentViewYaw()-yaw:0;
 }
 const seenShots=new Set();
 function makeTracerMesh(shot){
- const p1=new THREE.Vector3(worldPos(shot.x1),shot.y1??1.35,worldPos(shot.z1));
+ let p1;
+ const shooterModel=shot.shooterId?actors3d.get(shot.shooterId):null;
+ if(shooterModel&&shooterModel.userData?.muzzle){
+  const muzzleWorld=new THREE.Vector3();
+  shooterModel.userData.muzzle.getWorldPosition(muzzleWorld);
+  p1=muzzleWorld;
+ }else{
+  p1=new THREE.Vector3(worldPos(shot.x1),shot.y1??1.35,worldPos(shot.z1));
+ }
  const p2=new THREE.Vector3(worldPos(shot.x2),Math.max(0.08,shot.y2??1.2),worldPos(shot.z2));
  const dist=p1.distanceTo(p2);
  if(dist<0.2)return null;
@@ -252,8 +275,12 @@ function sync3D(){
  }
  drawMinimap();
 }
+let lastMinimapDraw=0;
 function drawMinimap(){
  if(!miniCtx||!gameState||gameState.status!=='playing')return;
+ const now=performance.now();
+ if(now-lastMinimapDraw<65)return;
+ lastMinimapDraw=now;
  const ctx=miniCtx,w=miniCanvas.width,h=miniCanvas.height,pad=12,size=w-pad*2;ctx.clearRect(0,0,w,h);ctx.fillStyle='#101925';ctx.fillRect(0,0,w,h);
  const point=(x,z)=>[pad+x/32*size,pad+z/32*size];
  ctx.strokeStyle='rgba(163,177,192,.28)';ctx.lineWidth=3;
@@ -276,8 +303,20 @@ function frame3D(now=0){
  if(storm3d&&gameState?.map==='muscat'){const positions=storm3d.geometry.attributes.position.array,{vx,vz}=storm3d.userData;for(let i=0;i<vx.length;i++){const k=i*3;positions[k]+=vx[i]*dt;positions[k+2]+=vz[i]*dt;if(positions[k]>59){positions[k]=-59;positions[k+2]=(Math.random()-.5)*116;positions[k+1]=Math.random()*15+.2}if(positions[k+2]>59)positions[k+2]=-59}storm3d.geometry.attributes.position.needsUpdate=true;}
  if(snow3d&&gameState?.map==='paris'){const positions=snow3d.geometry.attributes.position.array,{speed,driftX,driftZ}=snow3d.userData;for(let i=0;i<speed.length;i++){const k=i*3;positions[k+1]-=speed[i]*dt;positions[k]+=driftX[i]*dt;positions[k+2]+=driftZ[i]*dt;if(positions[k+1]<0){positions[k]=(Math.random()-.5)*112;positions[k+1]=54+Math.random()*8;positions[k+2]=(Math.random()-.5)*112}}snow3d.geometry.attributes.position.needsUpdate=true;}
  for(const [id,model]of actors3d){if(id.startsWith('house:')||id.startsWith('shot:'))continue;
-  if(model.userData.targetPosition)model.position.lerp(model.userData.targetPosition,1-Math.exp(-dt*16));
-  if(Number.isFinite(model.userData.targetYaw)){const delta=Math.atan2(Math.sin(model.userData.targetYaw-model.rotation.y),Math.cos(model.userData.targetYaw-model.rotation.y));model.rotation.y+=delta*(1-Math.exp(-dt*8))}
+  if(model.userData.targetPosition){
+   const dist=model.position.distanceTo(model.userData.targetPosition);
+   if(dist>15){
+    model.position.copy(model.userData.targetPosition);
+   }else if(dist>0.001){
+    const baseSpeed=model.userData.currentSpeed||6.0;
+    const moveStep=Math.min(dist,Math.max(dist*0.28,baseSpeed*dt*1.15+dist*0.12));
+    model.position.lerp(model.userData.targetPosition,moveStep/dist);
+   }
+  }
+  if(Number.isFinite(model.userData.targetYaw)){
+   const delta=Math.atan2(Math.sin(model.userData.targetYaw-model.rotation.y),Math.cos(model.userData.targetYaw-model.rotation.y));
+   model.rotation.y+=delta*Math.min(1,Math.max(dt*12,1-Math.exp(-dt*14)));
+  }
   const inputMove=!!(keyState.w||keyState.W||keyState.s||keyState.S||keyState.a||keyState.A||keyState.d||keyState.D||keyState.ArrowUp||keyState.ArrowDown||keyState.ArrowLeft||keyState.ArrowRight),moving=Date.now()<(model.userData.walkingUntil||0)||(model.userData.local&&inputMove);
   if(model.userData.legs){const swing=moving?Math.sin(now*.011)*.44:0;for(let i=0;i<model.userData.legs.length;i++){const target=i===0?swing:-swing;model.userData.legs[i].rotation.x+=(target-model.userData.legs[i].rotation.x)*(1-Math.exp(-dt*(moving?12:9)))}}
   if(model.userData.gun){model.userData.recoil=Math.max(0,(model.userData.recoil||0)-dt*.8);model.userData.gun.position.z=-.2-model.userData.recoil;const actor=selfActor();model.userData.gun.rotation.set(-cameraPitch,model.userData.local?cameraYaw-(actor?.yaw||0):0,0)}
