@@ -194,6 +194,40 @@ function setActorTarget(model,x,z,yaw,backwards=false,local=false){
  model.userData.targetYaw=yaw+Math.PI+(backwards?Math.PI:0);model.userData.backwards=backwards;
  if(model.userData.gun)model.userData.gun.rotation.y=local?currentViewYaw()-yaw:0;
 }
+const seenShots=new Set();
+function makeTracerMesh(shot){
+ const p1=new THREE.Vector3(worldPos(shot.x1),shot.y1??1.35,worldPos(shot.z1));
+ const p2=new THREE.Vector3(worldPos(shot.x2),Math.max(0.08,shot.y2??1.2),worldPos(shot.z2));
+ const dist=p1.distanceTo(p2);
+ if(dist<0.2)return null;
+ const group=new THREE.Group(),isPolice=shot.team==='police';
+ const beamColor=gameState?.map==='muscat'?(isPolice?'#ffe885':'#ff7a38'):(isPolice?'#ffcf59':'#ff5533');
+ const dir=new THREE.Vector3().subVectors(p2,p1).normalize(),mid=new THREE.Vector3().addVectors(p1,p2).multiplyScalar(0.5);
+ const outerMat=new THREE.MeshBasicMaterial({color:beamColor,transparent:true,opacity:0.8,depthWrite:false});
+ outerMat.userData={baseOpacity:0.8};
+ group.add(new THREE.Mesh(new THREE.CylinderGeometry(0.07,0.07,dist,6,1,false),outerMat));
+ const innerMat=new THREE.MeshBasicMaterial({color:'#ffffff',transparent:true,opacity:0.95,depthWrite:false});
+ innerMat.userData={baseOpacity:0.95};
+ group.add(new THREE.Mesh(new THREE.CylinderGeometry(0.028,0.028,dist,6,1,false),innerMat));
+ group.position.copy(mid);
+ group.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),dir);
+ const impactGroup=new THREE.Group();
+ impactGroup.position.set(0,dist/2,0);
+ const sparkMat=new THREE.MeshBasicMaterial({color:'#ffffff',transparent:true,opacity:1.0,depthWrite:false});
+ sparkMat.userData={baseOpacity:1.0};
+ impactGroup.add(new THREE.Mesh(new THREE.SphereGeometry(0.22,8,8),sparkMat));
+ const glowMat=new THREE.MeshBasicMaterial({color:beamColor,transparent:true,opacity:0.85,depthWrite:false});
+ glowMat.userData={baseOpacity:0.85};
+ impactGroup.add(new THREE.Mesh(new THREE.SphereGeometry(0.42,8,8),glowMat));
+ const ringMat=new THREE.MeshBasicMaterial({color:beamColor,transparent:true,opacity:0.9,side:THREE.DoubleSide,depthWrite:false});
+ ringMat.userData={baseOpacity:0.9};
+ const ring=new THREE.Mesh(new THREE.RingGeometry(0.08,0.45,12),ringMat);
+ ring.rotation.x=Math.PI/2;
+ impactGroup.add(ring);
+ group.add(impactGroup);
+ group.userData={born:performance.now(),duration:450,materials:[outerMat,innerMat,sparkMat,glowMat,ringMat],ring};
+ return group;
+}
 function sync3D(){
  if(!world3d||!gameState)return;
  const me=gameState.players.find(p=>p.id===gameState.selfId),current=new Set();
@@ -210,8 +244,7 @@ function sync3D(){
  for(const bird of gameState.birds){const id='bird:'+bird.id;let model=actors3d.get(id);if(!model){model=makeCock();actors3d.set(id,model)}model.visible=bird.alive;const target=new THREE.Vector3(worldPos(bird.x),.45,worldPos(bird.z));if(!model.userData.targetPosition){model.userData.targetPosition=target.clone();model.position.copy(target)}else model.userData.targetPosition.copy(target);model.userData.targetYaw=(bird.yaw||bird.phase||0)+Math.PI;for(const marker of model.userData.mineMarker||[])marker.visible=!!bird.isMine}
  for(const bird of gameState.birds){const model=actors3d.get('bird:'+bird.id);if(!model)continue;const mine=!!bird.isMine;if(!model.userData.keyBeam){const beam=new THREE.Mesh(new THREE.CylinderGeometry(.1,.28,4.8,10,1,true),new THREE.MeshBasicMaterial({color:'#73ff9b',transparent:true,opacity:.34,depthTest:false,depthWrite:false,side:THREE.DoubleSide}));beam.position.y=2.35;beam.renderOrder=20;model.add(beam);model.userData.keyBeam=beam;model.userData.bodyMesh=model.children[0]}model.userData.keyBeam.visible=mine&&bird.alive;if(model.userData.bodyMesh?.material?.emissive){model.userData.bodyMesh.material.emissive.set(mine?'#217b39':'#000000');model.userData.bodyMesh.material.emissiveIntensity=mine ? .8 : 0}}
  for(const key of gameState.droppedKeys||[]){const id='keydrop:'+key.id;current.add(id);let model=actors3d.get(id);if(!model){model=makeDroppedKey();actors3d.set(id,model)}model.position.set(worldPos(key.x),.28,worldPos(key.z));model.rotation.y=Date.now()*.0012}
- for(const shot of gameState.tracers||[]){const id='shot:'+shot.id;let line=actors3d.get(id);if(!line){const points=[new THREE.Vector3(worldPos(shot.x1),shot.y1??1.2,worldPos(shot.z1)),new THREE.Vector3(worldPos(shot.x2),shot.y2??1.2,worldPos(shot.z2))];line=new THREE.Line(new THREE.BufferGeometry().setFromPoints(points),new THREE.LineBasicMaterial({color:gameState.map==='muscat'?(shot.team==='police'?'#fff2b0':'#ff8750'):(shot.team==='police'?'#f2d187':'#ee7e55'),transparent:true,opacity:.95,fog:gameState.map!=='muscat'}));world3d.add(line);actors3d.set(id,line);line.userData.expires=shot.expires}}
- for(const [id,obj]of actors3d)if(id.startsWith('shot:')&&obj.userData.expires<Date.now()){world3d.remove(obj);actors3d.delete(id)}
+ for(const shot of gameState.tracers||[]){const id='shot:'+shot.id;if(!actors3d.has(id)&&!seenShots.has(id)){const line=makeTracerMesh(shot);if(line){world3d.add(line);actors3d.set(id,line)}}}
  const selfActor=me?.role==='police'?gameState.cops.find(x=>x.id===me.id):gameState.thieves.find(x=>x.id===me.id);
  if(selfActor){const px=worldPos(selfActor.x),pz=worldPos(selfActor.z),yaw=currentViewYaw(),lookAhead=4.6;
   camGoalPos??=new THREE.Vector3();camGoalLook??=new THREE.Vector3();const scoped=aiming&&isScopedWeapon(),shoulder=scoped?.95:1.15,aimBack=scoped?3.15:5.4,rawX=px+Math.sin(yaw)*aimBack+Math.cos(yaw)*shoulder,rawZ=pz+Math.cos(yaw)*aimBack-Math.sin(yaw)*shoulder,safe=avoidCameraWalls(px,pz,rawX,rawZ);camGoalPos.set(safe.x,1.9,safe.z);camGoalLook.set(safe.x-Math.sin(yaw)*lookAhead,1.9+Math.tan(cameraPitch)*lookAhead,safe.z-Math.cos(yaw)*lookAhead);
@@ -247,6 +280,18 @@ function frame3D(now=0){
   const inputMove=!!(keyState.w||keyState.W||keyState.s||keyState.S||keyState.a||keyState.A||keyState.d||keyState.D||keyState.ArrowUp||keyState.ArrowDown||keyState.ArrowLeft||keyState.ArrowRight),moving=Date.now()<(model.userData.walkingUntil||0)||(model.userData.local&&inputMove);
   if(model.userData.legs){const swing=moving?Math.sin(now*.011)*.44:0;for(let i=0;i<model.userData.legs.length;i++){const target=i===0?swing:-swing;model.userData.legs[i].rotation.x+=(target-model.userData.legs[i].rotation.x)*(1-Math.exp(-dt*(moving?12:9)))}}
   if(model.userData.gun){model.userData.recoil=Math.max(0,(model.userData.recoil||0)-dt*.8);model.userData.gun.position.z=-.2-model.userData.recoil;const actor=selfActor();model.userData.gun.rotation.set(-cameraPitch,model.userData.local?cameraYaw-(actor?.yaw||0):0,0)}
+ }
+ const nowMs=performance.now();
+ for(const [id,obj]of actors3d){
+  if(id.startsWith('shot:')){
+   const elapsed=nowMs-(obj.userData.born||nowMs),progress=elapsed/(obj.userData.duration||450);
+   if(progress>=1){world3d.remove(obj);actors3d.delete(id);seenShots.add(id);if(seenShots.size>250)seenShots.clear()}
+   else{
+    const fade=Math.max(0,1-progress);
+    if(obj.userData.materials)for(const m of obj.userData.materials)m.opacity=(m.userData.baseOpacity??0.8)*fade;
+    if(obj.userData.ring){const scale=1+progress*0.9;obj.userData.ring.scale.set(scale,scale,scale)}
+   }
+  }
  }
  updateCameraGoal();if(cam3d){const r=canvas.getBoundingClientRect();if(r.width&&r.height&&Math.abs(cam3d.aspect-r.width/r.height)>.01)resize3D();const weapon=gameState?.cops.find(c=>c.id===gameState.selfId)?.weapon||gameState?.thieves.find(t=>t.id===gameState.selfId)?.weapon,sniper=weapon==='sniper',rifle=weapon==='rifle',targetFov=aiming&&isScopedWeapon(weapon)?68/(sniper?10:rifle?2:1):68;cam3d.fov+=(targetFov-cam3d.fov)*(1-Math.exp(-dt*10));cam3d.updateProjectionMatrix();if(camGoalPos&&camGoalLook){if(!cam3d.userData.followReady||cameraWall(cam3d.position.x,cam3d.position.z)){cam3d.position.copy(camGoalPos);cam3d.userData.lookTarget=camGoalLook.clone();cam3d.userData.followReady=true}else{const smooth=1-Math.exp(-dt*9);cam3d.position.lerp(camGoalPos,smooth);cam3d.userData.lookTarget.lerp(camGoalLook,smooth)}cam3d.lookAt(cam3d.userData.lookTarget)}renderer3d.render(scene3d,cam3d)}
 }
