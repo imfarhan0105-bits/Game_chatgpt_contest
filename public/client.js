@@ -99,14 +99,79 @@ function makeFacade(base){if(facadeCache.has(base))return facadeCache.get(base);
 function makeStreetTexture(){const c=document.createElement('canvas');c.width=512;c.height=512;const x=c.getContext('2d');x.fillStyle='#353b43';x.fillRect(0,0,512,512);for(let i=0;i<24000;i++){const px=Math.random()*512,py=Math.random()*512,v=Math.floor(Math.random()*35)+35;x.fillStyle=`rgba(${v},${v+4},${v+2},${Math.random()*.24})`;x.fillRect(px,py,1+Math.random()*2,1+Math.random()*2)}const t=new THREE.CanvasTexture(c);t.wrapS=t.wrapT=THREE.RepeatWrapping;t.repeat.set(7,7);t.colorSpace=THREE.SRGBColorSpace;return t}
 const WORLD_SCALE=3.5,MAP_CENTER=16;
 function worldPos(g){return(g-MAP_CENTER)*WORLD_SCALE}
+function mapPos(w){return w/WORLD_SCALE+MAP_CENTER}
+const CAR_POS=[[16,6],[12,10],[20,22],[8,18],[24,26]];
+const TREE_POS=Array.from({length:8},(_,i)=>{const a=i*Math.PI/4;return[16+Math.sin(a)*11/3.5,16+Math.cos(a)*11/3.5]});
 function cameraWall(x,z){
  const gx=x/WORLD_SCALE+MAP_CENTER,gz=z/WORLD_SCALE+MAP_CENTER;
  if(gx<.4||gx>31.6||gz<.4||gz>31.6)return true;
  const centerDist=Math.hypot(gx-16,gz-16),centerRad=gameState?.map==='paris'?1.4:gameState?.map==='muscat'?1.6:gameState?.map==='miami'?3.6:0.56;
  if(centerDist<centerRad)return true;
- for(let bx=2;bx<=30;bx+=4)for(let bz=2;bz<=30;bz+=4){if(Math.hypot(bx-16,bz-16)<6)continue;if(Math.abs(gx-bx)<1.22&&Math.abs(gz-bz)<1.22)return true}
- for(const h of gameState?.houses||[])if(Math.abs(gx-h.x)<.6&&Math.abs(gz-h.z)<.55)return true;
+ for(let bx=2;bx<=30;bx+=4)for(let bz=2;bz<=30;bz+=4){if(Math.hypot(bx-16,bz-16)<6)continue;if(Math.abs(gx-bx)<1.28&&Math.abs(gz-bz)<1.28)return true}
+ if(CAR_POS.some(([cx,cz])=>Math.abs(gx-cx)<.42&&Math.abs(gz-cz)<.8))return true;
+ if(TREE_POS.some(([tx,tz])=>Math.hypot(gx-tx,gz-tz)<.43))return true;
+ const lx=Math.round((gx-.986)/4)*4+.986,lz=Math.round((gz-.986)/4)*4+.986;
+ if(lx>=.9&&lx<=33&&lz>=.9&&lz<=33){if(Math.hypot(gx-lx,gz-lz)<.105)return true}
+ for(const h of gameState?.houses||[])if(Math.abs(gx-h.x)<.42&&Math.abs(gz-h.z)<.38)return true;
  return false;
+}
+function blockedRay(x,z){
+ const gx=x/WORLD_SCALE+MAP_CENTER,gz=z/WORLD_SCALE+MAP_CENTER;
+ const bx=Math.round((gx-2)/4)*4+2,bz=Math.round((gz-2)/4)*4+2;
+ if(bx>=2&&bx<=30&&bz>=2&&bz<=30&&Math.hypot(bx-16,bz-16)>=6){
+  if(Math.abs(gx-bx)<1.18&&Math.abs(gz-bz)<1.18)return true;
+ }
+ const centerDist=Math.hypot(gx-16,gz-16),centerRad=gameState?.map==='paris'?1.4:gameState?.map==='muscat'?1.6:gameState?.map==='miami'?3.6:0.56;
+ if(centerDist<centerRad)return true;
+ for(const [cx,cz] of CAR_POS){
+  if(Math.abs(gx-cx)<.31&&Math.abs(gz-cz)<.62)return true;
+ }
+ for(const [tx,tz] of TREE_POS){
+  if(Math.hypot(gx-tx,gz-tz)<.2)return true;
+ }
+ for(const h of gameState?.houses||[])if(Math.abs(gx-h.x)<.44&&Math.abs(gz-h.z)<.28)return true;
+ return false;
+}
+function raySphereDist(origin,dir,center,radius){
+ const ox=origin.x-center.x,oy=origin.y-center.y,oz=origin.z-center.z;
+ const b=ox*dir.x+oy*dir.y+oz*dir.z,c=ox*ox+oy*oy+oz*oz-radius*radius,disc=b*b-c;
+ if(disc<0)return null;
+ const root=Math.sqrt(disc),near=-b-root,far=-b+root;
+ return near>=0?near:far>=0?far:null;
+}
+function calcAimImpact(origin,dir,maxRange=112){
+ const isCop=gameState?.players.find(p=>p.id===gameState.selfId)?.role==='police';
+ let maxDist=maxRange;
+ if(dir.y<-0.001){
+  const dGround=(0.05-origin.y)/dir.y;
+  if(dGround>0&&dGround<maxDist)maxDist=dGround;
+ }
+ const steps=Math.max(10,Math.ceil(maxDist*2.8));
+ for(let s=1;s<=steps;s++){
+  const d=(s/steps)*maxDist,wx=origin.x+dir.x*d,wz=origin.z+dir.z*d;
+  if(blockedRay(wx,wz)){maxDist=d;break}
+ }
+ let targetHit=null,minTargetD=maxDist;
+ if(isCop){
+  for(const t of gameState?.thieves||[]){
+   const player=gameState?.players.find(p=>p.id===t.id);
+   if(!player||player.escaped||player.alive===false)continue;
+   const tx=worldPos(t.x),tz=worldPos(t.z);
+   const d=raySphereDist(origin,dir,{x:tx,y:1.15,z:tz},0.72);
+   if(d!=null&&d<minTargetD){minTargetD=d;targetHit={x:tx,y:1.15,z:tz}}
+  }
+ }else{
+  for(const b of gameState?.birds||[]){
+   if(!b.alive||!b.isMine)continue;
+   const bx=worldPos(b.x),bz=worldPos(b.z);
+   const d=raySphereDist(origin,dir,{x:bx,y:0.65,z:bz},0.78);
+   if(d!=null&&d<minTargetD){minTargetD=d;targetHit={x:bx,y:0.65,z:bz}}
+  }
+ }
+ if(targetHit&&minTargetD<=maxDist+0.4){
+  return new THREE.Vector3(origin.x+dir.x*minTargetD,origin.y+dir.y*minTargetD,origin.z+dir.z*minTargetD);
+ }
+ return new THREE.Vector3(origin.x+dir.x*maxDist,Math.max(0.05,origin.y+dir.y*maxDist),origin.z+dir.z*maxDist);
 }
 function avoidCameraWalls(px,pz,x,z){let safe=1;for(let i=1;i<=56;i++){const t=i/56;if(cameraWall(px+(x-px)*t,pz+(z-pz)*t)){safe=Math.max(.025,t-1/56);break}}return{ x:px+(x-px)*safe,z:pz+(z-pz)*safe }}
 function makeParisFacade(base){if(facadeCache.has('paris:'+base))return facadeCache.get('paris:'+base);const c=document.createElement('canvas');c.width=512;c.height=768;const x=c.getContext('2d');x.fillStyle=base;x.fillRect(0,0,512,768);for(let y=0;y<768;y+=5){x.fillStyle=y%10?'rgba(255,245,220,.035)':'rgba(38,34,28,.045)';x.fillRect(0,y,512,1)}for(let floor=0;floor<6;floor++){const yy=32+floor*112;x.fillStyle='rgba(46,43,37,.55)';x.fillRect(0,yy+83,512,9);for(let col=0;col<5;col++){const xx=32+col*96,lit=Math.random()>.55;x.fillStyle='#4b463d';x.beginPath();x.roundRect(xx-4,yy-5,60,84,30);x.fill();x.fillStyle=lit?'#d8b676':'#26343b';x.beginPath();x.roundRect(xx,yy,52,77,26);x.fill();x.fillStyle='rgba(32,42,47,.52)';x.fillRect(xx+24,yy+3,3,71);x.fillStyle='#b2a486';x.fillRect(xx-11,yy+77,74,5);x.fillStyle='#45423b';x.fillRect(xx-12,yy+83,76,3);x.fillStyle='rgba(225,211,178,.3)';x.fillRect(xx+5,yy+4,4,68)}}x.fillStyle='rgba(226,212,182,.6)';x.fillRect(0,0,512,13);x.fillRect(0,755,512,13);const texture=new THREE.CanvasTexture(c);texture.colorSpace=THREE.SRGBColorSpace;texture.anisotropy=4;facadeCache.set('paris:'+base,texture);return texture}
@@ -340,7 +405,7 @@ function sync3D(){
  for(const bird of gameState.birds){const id='bird:'+bird.id;let model=actors3d.get(id);if(!model){model=makeCock();model.userData.isBird=true;actors3d.set(id,model)}model.visible=bird.alive;setActorTarget(model,bird.x,bird.z,(bird.yaw||bird.phase||0)+Math.PI,false,false);for(const marker of model.userData.mineMarker||[])marker.visible=!!bird.isMine}
  for(const bird of gameState.birds){const model=actors3d.get('bird:'+bird.id);if(!model)continue;const mine=!!bird.isMine;if(!model.userData.keyBeam){const beam=new THREE.Mesh(new THREE.CylinderGeometry(.1,.28,4.8,10,1,true),new THREE.MeshBasicMaterial({color:'#73ff9b',transparent:true,opacity:.34,depthTest:false,depthWrite:false,side:THREE.DoubleSide}));beam.position.y=2.35;beam.renderOrder=20;model.add(beam);model.userData.keyBeam=beam;model.userData.bodyMesh=model.children[0]}model.userData.keyBeam.visible=mine&&bird.alive;if(model.userData.bodyMesh?.material?.emissive){model.userData.bodyMesh.material.emissive.set(mine?'#217b39':'#000000');model.userData.bodyMesh.material.emissiveIntensity=mine ? .8 : 0}}
  for(const key of gameState.droppedKeys||[]){const id='keydrop:'+key.id;current.add(id);let model=actors3d.get(id);if(!model){model=makeDroppedKey();actors3d.set(id,model)}model.position.set(worldPos(key.x),.28,worldPos(key.z));model.rotation.y=Date.now()*.0012}
- for(const shot of gameState.tracers||[]){const id='shot:'+shot.id;if(!actors3d.has(id)&&!seenShots.has(id)){const line=makeTracerMesh(shot);if(line){world3d.add(line);actors3d.set(id,line)}}}
+ for(const shot of gameState.tracers||[]){const id='shot:'+shot.id;if(!actors3d.has(id)&&!seenShots.has(id)){if(shot.shooterId===gameState.selfId){seenShots.add(id);continue}const line=makeTracerMesh(shot);if(line){world3d.add(line);actors3d.set(id,line)}}}
  updateCameraGoal();
  drawMinimap();
 }
@@ -382,7 +447,7 @@ function frame3D(now=0){
  requestAnimationFrame(frame3D);if(!renderer3d)return;const dt=Math.min(.05,(now-lastFrame)/1000||0);lastFrame=now;
  if(storm3d&&gameState?.map==='muscat'){const positions=storm3d.geometry.attributes.position.array,{vx,vz}=storm3d.userData;for(let i=0;i<vx.length;i++){const k=i*3;positions[k]+=vx[i]*dt;positions[k+2]+=vz[i]*dt;if(positions[k]>59){positions[k]=-59;positions[k+2]=(Math.random()-.5)*116;positions[k+1]=Math.random()*15+.2}if(positions[k+2]>59)positions[k+2]=-59}storm3d.geometry.attributes.position.needsUpdate=true;}
  if(snow3d&&gameState?.map==='paris'){const positions=snow3d.geometry.attributes.position.array,{speed,driftX,driftZ}=snow3d.userData;for(let i=0;i<speed.length;i++){const k=i*3;positions[k+1]-=speed[i]*dt;positions[k]+=driftX[i]*dt;positions[k+2]+=driftZ[i]*dt;if(positions[k+1]<0){positions[k]=(Math.random()-.5)*112;positions[k+1]=54+Math.random()*8;positions[k+2]=(Math.random()-.5)*112}}snow3d.geometry.attributes.position.needsUpdate=true;}
- for(const [id,model]of actors3d){if(id.startsWith('house:')||id.startsWith('shot:'))continue;
+ for(const [id,model]of actors3d){if(id.startsWith('house:')||id.startsWith('shot:')||id.startsWith('keydrop:'))continue;
   if(model.userData.local){
    const me=gameState?.players.find(p=>p.id===gameState.selfId);
    if(me&&me.alive!==false&&!me.escaped){
@@ -401,10 +466,11 @@ function frame3D(now=0){
    }
    if(model.userData.targetPosition){
     const dist=model.position.distanceTo(model.userData.targetPosition);
-    if(dist>3.2){
+    if(dist>2.2||cameraWall(model.position.x,model.position.z)){
      model.position.copy(model.userData.targetPosition);
     }else if(dist>0.005){
-     model.position.lerp(model.userData.targetPosition,1-Math.exp(-dt*12));
+     const blendRate=moving?16:24;
+     model.position.lerp(model.userData.targetPosition,1-Math.exp(-dt*blendRate));
     }
    }
    model.userData.targetYaw=currentViewYaw()+Math.PI;
@@ -476,7 +542,47 @@ function frame3D(now=0){
  }
 }
 function drawMap(){ensure3D();sync3D()}
-function action(){if(gameState?.status==='playing'){const me=gameState.players.find(p=>p.id===gameState.selfId),gun=me?.role==='police'?gameState.cops.find(c=>c.id===me.id):gameState.thieves.find(t=>t.id===me.id),weapon=gun?.weapon||'rifle';if((gun?.ammo?.[weapon]??1)<=0)return;const ray=cam3d?cam3d.getWorldDirection(new THREE.Vector3()):viewDirection(),origin=cam3d?cam3d.position:camGoalPos;if(!origin)return;sound('shot');const model=me&&actors3d.get(me.id);if(model?.userData?.gun){model.userData.recoil=.12;model.userData.muzzle.visible=true;setTimeout(()=>{if(model.userData.muzzle)model.userData.muzzle.visible=false},55)}send({type:'action',action:'shoot',aim:{origin:{x:origin.x,y:origin.y,z:origin.z},direction:{x:ray.x,y:ray.y,z:ray.z},time:(gameState.serverTime||Date.now())-50}})}}
+function action(){
+ if(gameState?.status==='playing'){
+  const me=gameState.players.find(p=>p.id===gameState.selfId),
+        gun=me?.role==='police'?gameState.cops.find(c=>c.id===me.id):gameState.thieves.find(t=>t.id===me.id),
+        weapon=gun?.weapon||'rifle';
+  if((gun?.ammo?.[weapon]??1)<=0)return;
+  const ray=cam3d?cam3d.getWorldDirection(new THREE.Vector3()).normalize():viewDirection(),
+        origin=cam3d?cam3d.position.clone():(camGoalPos?camGoalPos.clone():new THREE.Vector3(worldPos(gun?.x??16),1.9,worldPos(gun?.z??16)));
+  if(!origin)return;
+  sound('shot');
+  const model=me&&actors3d.get(me.id);
+  if(model?.userData?.gun){
+   model.userData.recoil=.12;
+   model.userData.muzzle.visible=true;
+   setTimeout(()=>{if(model.userData.muzzle)model.userData.muzzle.visible=false},55);
+  }
+  const ranges={shotgun:4.5,sniper:32,rifle:24};
+  const rangeWorld=(ranges[weapon]||24)*WORLD_SCALE;
+  const impactPoint=calcAimImpact(origin,ray,rangeWorld);
+
+  const localShotId='shot:local_'+Date.now()+'_'+Math.random().toString(36).slice(2,6);
+  const localShot={
+   id:localShotId,
+   shooterId:me.id,
+   x1:model?.position.x?mapPos(model.position.x):(gun?.x??16),
+   z1:model?.position.z?mapPos(model.position.z):(gun?.z??16),
+   y1:1.35,
+   x2:mapPos(impactPoint.x),
+   z2:mapPos(impactPoint.z),
+   y2:impactPoint.y,
+   team:me.role==='police'?'police':'thief'
+  };
+  const line=makeTracerMesh(localShot);
+  if(line&&world3d){
+   world3d.add(line);
+   actors3d.set(localShotId,line);
+  }
+
+  send({type:'action',action:'shoot',aim:{origin:{x:origin.x,y:origin.y,z:origin.z},direction:{x:ray.x,y:ray.y,z:ray.z},time:(gameState.serverTime||Date.now())-50}});
+ }
+}
 function interact(){send({type:'action',action:'interact'})}
 const MOVEMENT_KEY_ALIASES={KeyW:['w','W'],KeyA:['a','A'],KeyS:['s','S'],KeyD:['d','D'],ArrowUp:['ArrowUp'],ArrowLeft:['ArrowLeft'],ArrowDown:['ArrowDown'],ArrowRight:['ArrowRight'],ShiftLeft:['Shift'],ShiftRight:['Shift']};
 let lastMoveSend=0;

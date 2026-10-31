@@ -22,7 +22,7 @@ const TREE_POS=Array.from({length:8},(_,i)=>{const a=i*Math.PI/4;return[16+Math.
 function blocked(x,z,r=null,entity=null,ignore=null){
  const bx=Math.round((x-2)/4)*4+2,bz=Math.round((z-2)/4)*4+2;
  if(bx>=2&&bx<=30&&bz>=2&&bz<=30){
-  if(Math.hypot(bx-16,bz-16)>=6&&Math.abs(x-bx)<1.35&&Math.abs(z-bz)<1.35)return true;
+  if(Math.hypot(bx-16,bz-16)>=6&&Math.abs(x-bx)<1.28&&Math.abs(z-bz)<1.28)return true;
  }
  if(Math.hypot(x-16,z-16)<(r?.map==='paris'?1.4:r?.map==='muscat'?1.6:r?.map==='miami'?3.6:.56))return true;
  if(CAR_POS.some(([cx,cz])=>Math.abs(x-cx)<.42&&Math.abs(z-cz)<.8))return true;
@@ -32,13 +32,139 @@ function blocked(x,z,r=null,entity=null,ignore=null){
   if(Math.hypot(x-lx,z-lz)<.105)return true;
  }
  if(r){
-  if(r.houses.some(h=>Math.abs(x-h.x)<.58&&Math.abs(z-h.z)<.42))return true;
+  if(r.houses.some(h=>Math.abs(x-h.x)<.42&&Math.abs(z-h.z)<.38))return true;
   const others=[...r.cops,...r.thieves];
-  if(!entity?.key&&others.some(o=>o!==entity&&o!==ignore&&o.alive!==false&&Math.hypot(x-o.x,z-o.z)<.32))return true;
+  if(!entity?.key&&others.some(o=>o!==entity&&o!==ignore&&o.alive!==false&&!o.escaped&&Math.hypot(x-o.x,z-o.z)<.32))return true;
  }
  return false;
 }
-function canStep(x,z,r=null,entity=null){return x>=.35&&x<=31.65&&z>=.35&&z<=31.65&&!blocked(x,z,r,entity)}
+function obstaclePenetration(x,z,r=null,entity=null,ignore=null){
+ let maxPen=0;
+ const bx=Math.round((x-2)/4)*4+2,bz=Math.round((z-2)/4)*4+2;
+ if(bx>=2&&bx<=30&&bz>=2&&bz<=30&&Math.hypot(bx-16,bz-16)>=6){
+  const ox=1.28-Math.abs(x-bx),oz=1.28-Math.abs(z-bz);
+  if(ox>0&&oz>0)maxPen=Math.max(maxPen,Math.min(ox,oz));
+ }
+ const centerDist=Math.hypot(x-16,z-16),centerRad=r?.map==='paris'?1.4:r?.map==='muscat'?1.6:r?.map==='miami'?3.6:0.56;
+ if(centerDist<centerRad)maxPen=Math.max(maxPen,centerRad-centerDist);
+ for(const [cx,cz] of CAR_POS){
+  const ox=0.42-Math.abs(x-cx),oz=0.8-Math.abs(z-cz);
+  if(ox>0&&oz>0)maxPen=Math.max(maxPen,Math.min(ox,oz));
+ }
+ for(const [tx,tz] of TREE_POS){
+  const d=Math.hypot(x-tx,z-tz);
+  if(d<0.43)maxPen=Math.max(maxPen,0.43-d);
+ }
+ const lx=Math.round((x-.986)/4)*4+.986,lz=Math.round((z-.986)/4)*4+.986;
+ if(lx>=.9&&lx<=33&&lz>=.9&&lz<=33){
+  const d=Math.hypot(x-lx,z-lz);
+  if(d<0.105)maxPen=Math.max(maxPen,0.105-d);
+ }
+ if(r){
+  for(const h of r.houses){
+   const ox=0.42-Math.abs(x-h.x),oz=0.38-Math.abs(z-h.z);
+   if(ox>0&&oz>0)maxPen=Math.max(maxPen,Math.min(ox,oz));
+  }
+  const others=[...r.cops,...r.thieves];
+  if(!entity?.key){
+   for(const o of others){
+    if(o!==entity&&o!==ignore&&o.alive!==false&&!o.escaped){
+     const d=Math.hypot(x-o.x,z-o.z);
+     if(d<0.32)maxPen=Math.max(maxPen,0.32-d);
+    }
+   }
+  }
+ }
+ return maxPen;
+}
+function resolvePenetration(ent,r=null){
+ if(!ent)return;
+ for(let iter=0;iter<4;iter++){
+  let changed=false;
+  const x=ent.x,z=ent.z;
+  const bx=Math.round((x-2)/4)*4+2,bz=Math.round((z-2)/4)*4+2;
+  if(bx>=2&&bx<=30&&bz>=2&&bz<=30&&Math.hypot(bx-16,bz-16)>=6){
+   const ox=1.28-Math.abs(x-bx),oz=1.28-Math.abs(z-bz);
+   if(ox>0&&oz>0){
+    if(ox<oz)ent.x=bx+Math.sign(x-bx||1)*1.285;
+    else ent.z=bz+Math.sign(z-bz||1)*1.285;
+    changed=true;
+   }
+  }
+  const centerDist=Math.hypot(ent.x-16,ent.z-16),centerRad=r?.map==='paris'?1.4:r?.map==='muscat'?1.6:r?.map==='miami'?3.6:0.56;
+  if(centerDist<centerRad){
+   const ang=Math.atan2(ent.z-16,ent.x-16);
+   ent.x=16+Math.cos(ang)*(centerRad+0.015);
+   ent.z=16+Math.sin(ang)*(centerRad+0.015);
+   changed=true;
+  }
+  for(const [cx,cz] of CAR_POS){
+   const ox=0.42-Math.abs(ent.x-cx),oz=0.8-Math.abs(ent.z-cz);
+   if(ox>0&&oz>0){
+    if(ox<oz)ent.x=cx+Math.sign(ent.x-cx||1)*0.425;
+    else ent.z=cz+Math.sign(ent.z-cz||1)*0.805;
+    changed=true;
+   }
+  }
+  for(const [tx,tz] of TREE_POS){
+   const d=Math.hypot(ent.x-tx,ent.z-tz);
+   if(d<0.43){
+    const ang=Math.atan2(ent.z-tz,ent.x-tx);
+    ent.x=tx+Math.cos(ang)*0.435;
+    ent.z=tz+Math.sin(ang)*0.435;
+    changed=true;
+   }
+  }
+  const lx=Math.round((ent.x-.986)/4)*4+.986,lz=Math.round((ent.z-.986)/4)*4+.986;
+  if(lx>=.9&&lx<=33&&lz>=.9&&lz<=33){
+   const d=Math.hypot(ent.x-lx,ent.z-lz);
+   if(d<0.105){
+    const ang=Math.atan2(ent.z-lz,ent.x-lx);
+    ent.x=lx+Math.cos(ang)*0.108;
+    ent.z=lz+Math.sin(ang)*0.108;
+    changed=true;
+   }
+  }
+  if(r){
+   for(const h of r.houses){
+    const ox=0.42-Math.abs(ent.x-h.x),oz=0.38-Math.abs(ent.z-h.z);
+    if(ox>0&&oz>0){
+     if(ox<oz)ent.x=h.x+Math.sign(ent.x-h.x||1)*0.425;
+     else ent.z=h.z+Math.sign(ent.z-h.z||1)*0.385;
+     changed=true;
+    }
+   }
+   if(!ent.key){
+    for(const o of [...r.cops,...r.thieves]){
+     if(o!==ent&&o.alive!==false&&!o.escaped){
+      const d=Math.hypot(ent.x-o.x,ent.z-o.z);
+      if(d<0.32){
+       const ang=Math.atan2(ent.z-o.z,ent.x-o.x);
+       ent.x=o.x+Math.cos(ang)*0.325;
+       ent.z=o.z+Math.sin(ang)*0.325;
+       changed=true;
+      }
+     }
+    }
+   }
+  }
+  ent.x=clamp(ent.x,.35,31.65);
+  ent.z=clamp(ent.z,.35,31.65);
+  if(!changed)break;
+ }
+}
+function canStep(x,z,r=null,entity=null){
+ if(x<.35||x>31.65||z<.35||z>31.65)return false;
+ if(!blocked(x,z,r,entity))return true;
+ if(entity&&entity.x!=null&&entity.z!=null&&r){
+  const curPen=obstaclePenetration(entity.x,entity.z,r,entity);
+  if(curPen>0){
+   const newPen=obstaclePenetration(x,z,r,entity);
+   if(newPen<curPen-0.00001)return true;
+  }
+ }
+ return false;
+}
 function startGame(r){
  const ps=r.players.filter(p=>p.connected),cops=ps.filter(p=>p.role==='police'),thieves=ps.filter(p=>p.role==='thief');if(ps.length<2||ps.length>10||ps.some(p=>!['police','thief'].includes(p.role))||cops.length<1||cops.length>maxPoliceFor(ps.length)||thieves.length<1||thieves.length>7)return false;
  ps.forEach(p=>{p.alive=true;p.escaped=false;p.place=null});
@@ -57,8 +183,61 @@ function startGame(r){
  r.tracers=[];r.droppedKeys=[];r.status='playing';r.startedAt=Date.now();r.matchEndsAt=r.startedAt+180000;r.winner=null;event(r,`The chase is on. ${cops.length} police are in the district; the city clock is set to three minutes.`);return true
 }
 const distance=(a,b)=>Math.hypot(a.x-b.x,a.z-b.z);
-function clearShot(a,b,r=null,source=null,target=null){const steps=Math.ceil(distance(a,b)*8);for(let i=2;i<steps-1;i++){const t=i/steps;if(blocked(a.x+(b.x-a.x)*t,a.z+(b.z-a.z)*t,r,source,target||b))return false}return true}
-function move(ent,dx,dz,sprint=false,speedOverride=null,r=null){const mag=Math.hypot(dx,dz)||1,speed=speedOverride??(sprint?.145:.085),nx=clamp(ent.x+dx/mag*speed,.35,31.65),nz=clamp(ent.z+dz/mag*speed,.35,31.65);if(canStep(nx,ent.z,r,ent))ent.x=nx;if(canStep(ent.x,nz,r,ent))ent.z=nz}
+function blockedRay(x,z,r=null){
+ const bx=Math.round((x-2)/4)*4+2,bz=Math.round((z-2)/4)*4+2;
+ if(bx>=2&&bx<=30&&bz>=2&&bz<=30&&Math.hypot(bx-16,bz-16)>=6){
+  if(Math.abs(x-bx)<1.18&&Math.abs(z-bz)<1.18)return true;
+ }
+ const centerDist=Math.hypot(x-16,z-16),centerRad=r?.map==='paris'?1.4:r?.map==='muscat'?1.6:r?.map==='miami'?3.6:0.56;
+ if(centerDist<centerRad)return true;
+ for(const [cx,cz] of CAR_POS){
+  if(Math.abs(x-cx)<.31&&Math.abs(z-cz)<.62)return true;
+ }
+ for(const [tx,tz] of TREE_POS){
+  if(Math.hypot(x-tx,z-tz)<.2)return true;
+ }
+ if(r){
+  for(const h of r.houses){
+   if(Math.abs(x-h.x)<.44&&Math.abs(z-h.z)<.28)return true;
+  }
+ }
+ return false;
+}
+function clearShot(a,b,r=null,source=null,target=null){
+ const steps=Math.ceil(distance(a,b)*8);
+ for(let i=2;i<steps-1;i++){
+  const t=i/steps;
+  if(blockedRay(a.x+(b.x-a.x)*t,a.z+(b.z-a.z)*t,r))return false;
+ }
+ return true;
+}
+function move(ent,dx,dz,sprint=false,speedOverride=null,r=null){
+ const mag=Math.hypot(dx,dz)||1,speed=speedOverride??(sprint?.145:.085);
+ if(r)resolvePenetration(ent,r);
+ const vx=dx/mag*speed,vz=dz/mag*speed,nx=clamp(ent.x+vx,.35,31.65),nz=clamp(ent.z+vz,.35,31.65);
+ if(canStep(nx,nz,r,ent)){ent.x=nx;ent.z=nz;return}
+ if(canStep(nx,ent.z,r,ent)){ent.x=nx;return}
+ if(canStep(ent.x,nz,r,ent)){ent.z=nz;return}
+ for(const factor of [0.6,0.3]){
+  const sx=clamp(ent.x+vx*factor,.35,31.65),sz=clamp(ent.z+vz*factor,.35,31.65);
+  if(canStep(sx,sz,r,ent)){ent.x=sx;ent.z=sz;return}
+  if(canStep(sx,ent.z,r,ent)){ent.x=sx;return}
+  if(canStep(ent.x,sz,r,ent)){ent.z=sz;return}
+ }
+ if(r)resolvePenetration(ent,r);
+}
+function safeDropKeyPos(pos,entity,r){
+ let keyX=pos.x,keyZ=pos.z;
+ const toP={x:entity.x-keyX,z:entity.z-keyZ},len=Math.hypot(toP.x,toP.z)||1;
+ for(let s=1;s<=16;s++){
+  const tx=clamp(keyX+(toP.x/len)*s*0.25,1,31),tz=clamp(keyZ+(toP.z/len)*s*0.25,1,31);
+  if(!blocked(tx,tz,r)&&obstaclePenetration(tx,tz,r)===0){
+   keyX=tx;keyZ=tz;
+   break;
+  }
+ }
+ return {x:keyX,z:keyZ};
+}
 function chooseBirdRun(b,threat,r){const dx=b.x-threat.x,dz=b.z-threat.z,len=Math.hypot(dx,dz)||1,awayX=dx/len,awayZ=dz/len,base=Math.atan2(awayZ,awayX);let best=null;for(const offset of [0,.38,-.38,.78,-.78,1.18,-1.18,1.57,-1.57,2.35,-2.35,Math.PI]){const a=base+offset,vx=Math.cos(a),vz=Math.sin(a),nx=clamp(b.x+vx*.065,.35,31.65),nz=clamp(b.z+vz*.065,.35,31.65);if(!canStep(nx,nz,r,b))continue;const progress=vx*awayX+vz*awayZ,clearance=distance({x:nx,z:nz},threat)-distance(b,threat),score=progress*2+clearance*3-Math.abs(offset)*.08+Math.random()*.025;if(!best||score>best.score)best={vx,vz,score}}return best}
 function finishIfDone(r){if(r.status!=='playing'||r.thieves.some(t=>t.alive&&!t.escaped))return;r.status='finished';r.winner=r.thieves.some(t=>t.escaped)?'thieves':'police';event(r,r.winner==='thieves'?'The surviving thieves made it home.':'The police caught every thief.')}
 function raySphere(origin,dir,center,radius){const ox=origin.x-center.x,oy=origin.y-center.y,oz=origin.z-center.z,b=ox*dir.x+oy*dir.y+oz*dir.z,c=ox*ox+oy*oy+oz*oz-radius*radius,disc=b*b-c;if(disc<0)return null;const root=Math.sqrt(disc),near=-b-root,far=-b+root;return near>=0?near:far>=0?far:null}
@@ -71,7 +250,14 @@ function rayCapsule(origin,dir,entity){
  const candidates=[raySphere(origin,dir,{x:wx,y:1.12,z:wz},.68),raySphere(origin,dir,{x:wx,y:1.72,z:wz},.34),raySphere(origin,dir,{x:wx,y:.43,z:wz},.38)].filter(Number.isFinite);
  return candidates.length?Math.min(...candidates):null
 }
-function rayBird(origin,dir,bird){const wx=(bird.x-MAP_CENTER)*WORLD_SCALE,wz=(bird.z-MAP_CENTER)*WORLD_SCALE;return[raySphere(origin,dir,{x:wx,y:.5,z:wz},.6),raySphere(origin,dir,{x:wx,y:.72,z:wz},.28)].filter(Number.isFinite).sort((a,b)=>a-b)[0]??null}
+function rayBird(origin,dir,bird){
+ const wx=(bird.x-MAP_CENTER)*WORLD_SCALE,wz=(bird.z-MAP_CENTER)*WORLD_SCALE;
+ return[
+  raySphere(origin,dir,{x:wx,y:.5,z:wz},.65),
+  raySphere(origin,dir,{x:wx,y:.75,z:wz},.38),
+  raySphere(origin,dir,{x:wx,y:1.05,z:wz},.42)
+ ].filter(Number.isFinite).sort((a,b)=>a-b)[0]??null;
+}
 function rayTarget(origin,dir,entities,range,r,source,isPolice,aimTime){
  const candidates=entities.map(t=>{const pos=positionAt(r,t,aimTime);return{t,pos,d:isPolice?rayCapsule(origin,dir,pos):rayBird(origin,dir,pos)}}).filter(q=>q.d!=null&&q.d<=range).sort((a,b)=>a.d-b.d);
  for(const q of candidates){const impact={x:origin.x+dir.x*q.d,y:origin.y+dir.y*q.d,z:origin.z+dir.z*q.d},impactMap={x:impact.x/WORLD_SCALE+MAP_CENTER,z:impact.z/WORLD_SCALE+MAP_CENTER};if(clearShot({x:origin.x/WORLD_SCALE+MAP_CENTER,z:origin.z/WORLD_SCALE+MAP_CENTER},impactMap,r,source,q.t))return{entity:q.t,position:q.pos,distance:q.d,impact}}
@@ -79,24 +265,52 @@ function rayTarget(origin,dir,entities,range,r,source,isPolice,aimTime){
 }
 function trace(r,from,to,team,hitHeight=1.9,shooterId=null){r.tracers.push({id:uid(),shooterId,x1:from.x,z1:from.z,y1:from.y??1.35,x2:to.x,z2:to.z,y2:hitHeight,team,expires:Date.now()+480})}
  const MAG={shotgun:3,sniper:5,rifle:30},WEAPONS=['rifle','shotgun','sniper'];
-function shoot(r,p,entity,msg){const now=Date.now();if(now<(entity.nextShot||0))return;const police=p.role==='police',weapon=entity.weapon||'rifle',ammo=entity.ammo?.[weapon]??0;if(ammo<=0){send(p.ws,{type:'error',message:`${weapon} empty — press R to reload`});return}
- const ranges={shotgun:4.5,sniper:32,rifle:24},cooldowns={shotgun:700,sniper:1050,rifle:105};entity.nextShot=now+cooldowns[weapon];entity.ammo[weapon]--;
+function shoot(r,p,entity,msg){
+ const now=Date.now();if(now<(entity.nextShot||0))return;
+ const police=p.role==='police',weapon=entity.weapon||'rifle',ammo=entity.ammo?.[weapon]??0;
+ if(ammo<=0){send(p.ws,{type:'error',message:`${weapon} empty — press R to reload`});return}
+ const ranges={shotgun:4.5,sniper:32,rifle:24},cooldowns={shotgun:700,sniper:1050,rifle:105};
+ entity.nextShot=now+cooldowns[weapon];entity.ammo[weapon]--;
  const aim=msg.aim||{},o=aim.origin||{},v=aim.direction||{},ox=Number(o.x),oy=Number(o.y),oz=Number(o.z),vx=Number(v.x),vy=Number(v.y),vz=Number(v.z),length=Math.hypot(vx,vy,vz),playerX=(entity.x-MAP_CENTER)*WORLD_SCALE,playerZ=(entity.z-MAP_CENTER)*WORLD_SCALE;
- const valid=[ox,oy,oz,vx,vy,vz,length].every(Number.isFinite)&&length>.9&&length<1.1&&Math.hypot(ox-playerX,oz-playerZ)<=8.5&&Math.abs(oy-1.9)<=.45;
+ const valid=[ox,oy,oz,vx,vy,vz,length].every(Number.isFinite)&&length>.9&&length<1.1&&Math.hypot(ox-playerX,oz-playerZ)<=8.5&&Math.abs(oy-1.9)<=.55;
  if(!valid){send(p.ws,{type:'error',message:'Aim ray rejected. Re-center the camera and fire again.'});entity.ammo[weapon]++;entity.nextShot=now;return}
  const aimTime=clamp(Number(aim.time)||now,now-180,now),origin={x:ox,y:oy,z:oz},dir={x:vx/length,y:vy/length,z:vz/length},targets=police?r.thieves.filter(t=>t.alive&&!t.escaped):r.birds.filter(b=>b.alive&&b.key===entity.houseId),rangeWorld=ranges[weapon]*WORLD_SCALE,rawHit=rayTarget(origin,dir,targets,rangeWorld,r,entity,police,aimTime);
- const startX=playerX,startY=1.35,startZ=playerZ;
- const hit=(rawHit&&((rawHit.impact.x-startX)*dir.x+(rawHit.impact.z-startZ)*dir.z>0.1))?rawHit:null;
  let maxDist=rangeWorld;
- if(dir.y<-0.001){const dGround=(0.05-startY)/dir.y;if(dGround>0&&dGround<maxDist)maxDist=dGround}
- const steps=Math.max(8,Math.ceil(maxDist*2.5));
- for(let s=1;s<=steps;s++){const d=(s/steps)*maxDist,wx=startX+dir.x*d,wz=startZ+dir.z*d,gx=wx/WORLD_SCALE+MAP_CENTER,gz=wz/WORLD_SCALE+MAP_CENTER;if(blocked(gx,gz,r,entity)){maxDist=d;break}}
- let impact=hit?.impact||{x:startX+dir.x*maxDist,y:Math.max(0.05,startY+dir.y*maxDist),z:startZ+dir.z*maxDist};
+ if(dir.y<-0.001){const dGround=(0.05-oy)/dir.y;if(dGround>0&&dGround<maxDist)maxDist=dGround}
+ const steps=Math.max(10,Math.ceil(maxDist*3));
+ for(let s=1;s<=steps;s++){const d=(s/steps)*maxDist,wx=ox+dir.x*d,wz=oz+dir.z*d,gx=wx/WORLD_SCALE+MAP_CENTER,gz=wz/WORLD_SCALE+MAP_CENTER;if(blockedRay(gx,gz,r)){maxDist=d;break}}
+ const hit=(rawHit&&rawHit.distance<=maxDist+0.35)?rawHit:null;
+ let impact=hit?.impact||{x:ox+dir.x*maxDist,y:Math.max(0.05,oy+dir.y*maxDist),z:oz+dir.z*maxDist};
  if(weapon==='shotgun'){
   const hits=targets.map(t=>{const pos=positionAt(r,t,aimTime),center={x:(pos.x-MAP_CENTER)*WORLD_SCALE,y:police?1.12:.48,z:(pos.z-MAP_CENTER)*WORLD_SCALE},along=(center.x-ox)*dir.x+(center.y-oy)*dir.y+(center.z-oz)*dir.z,miss=Math.hypot(center.x-(ox+dir.x*along),center.y-(oy+dir.y*along),center.z-(oz+dir.z*along)),spread=(police ? .58 : .42)+Math.max(0,along)*.045;return{t,pos,along,miss,spread}}).filter(q=>q.along>0&&q.along<=rangeWorld&&q.miss<=q.spread).sort((a,b)=>a.along-b.along).filter(q=>clearShot({x:ox/WORLD_SCALE+MAP_CENTER,z:oz/WORLD_SCALE+MAP_CENTER},{x:ox/WORLD_SCALE+MAP_CENTER+dir.x*q.along/WORLD_SCALE,z:oz/WORLD_SCALE+MAP_CENTER+dir.z*q.along/WORLD_SCALE},r,entity,q.t));
-  const caughtHits=hits.slice(0,3),caught=caughtHits.map(q=>q.t);if(caughtHits.length){const q=caughtHits[0];impact={x:(q.pos.x-MAP_CENTER)*WORLD_SCALE,y:police?1.12:.48,z:(q.pos.z-MAP_CENTER)*WORLD_SCALE} }for(const q of caughtHits){const t=q.t;t.alive=false;if(police){const v=r.players.find(x=>x.id===t.id);if(v)v.alive=false}else r.droppedKeys.push({id:uid(),key:t.key,x:q.pos.x,z:q.pos.z,ownerId:p.id,picked:false})}if(caught.length)event(r,police?`${p.name} fired the shotgun and caught ${caught.length} thief${caught.length===1?'':'s'}.`:`${p.name} downed the highlighted cock. Its key dropped there — reach it and press E.`);else event(r,`${p.name} fired the shotgun and missed.`)
- }else if(hit){const target=hit.entity;target.alive=false;if(police){const v=r.players.find(x=>x.id===target.id);if(v)v.alive=false;event(r,`${p.name} caught a thief with the ${weapon}.`)}else r.droppedKeys.push({id:uid(),key:target.key,x:hit.position.x,z:hit.position.z,ownerId:p.id,picked:false}),event(r,`${p.name} downed the highlighted cock. Its key dropped there — reach it and press E.`)}else{const wrongBird=!police?rayTarget(origin,dir,r.birds.filter(b=>b.alive&&b.key!==entity.houseId),rangeWorld,r,entity,false,aimTime):null;event(r,wrongBird?`${p.name} aimed at the wrong cock. Follow the green marker for the matching key.`:`${p.name} fired the ${weapon} and missed — center the target in your crosshair and keep a clear line of sight.`)}
- const muzzle={x:entity.x,y:1.35,z:entity.z},end=hit?hit.impact:impact,traceEnd={x:end.x/WORLD_SCALE+MAP_CENTER,y:end.y,z:end.z/WORLD_SCALE+MAP_CENTER};trace(r,muzzle,traceEnd,police?'police':'thief',traceEnd.y,p.id);finishIfDone(r)}
+  const caughtHits=hits.slice(0,3),caught=caughtHits.map(q=>q.t);
+  if(caughtHits.length){const q=caughtHits[0];impact={x:(q.pos.x-MAP_CENTER)*WORLD_SCALE,y:police?1.12:.48,z:(q.pos.z-MAP_CENTER)*WORLD_SCALE}}
+  for(const q of caughtHits){
+   const t=q.t;t.alive=false;
+   if(police){const v=r.players.find(x=>x.id===t.id);if(v)v.alive=false}
+   else{
+    const kp=safeDropKeyPos(q.pos,entity,r);
+    r.droppedKeys.push({id:uid(),key:t.key,x:kp.x,z:kp.z,ownerId:p.id,picked:false});
+   }
+  }
+  if(caught.length)event(r,police?`${p.name} fired the shotgun and caught ${caught.length} thief${caught.length===1?'':'s'}.`:`${p.name} downed the highlighted cock. Its key dropped there — reach it and press E.`);
+  else event(r,`${p.name} fired the shotgun and missed.`);
+ }else if(hit){
+  const target=hit.entity;target.alive=false;
+  if(police){const v=r.players.find(x=>x.id===target.id);if(v)v.alive=false;event(r,`${p.name} caught a thief with the ${weapon}.`)}
+  else{
+   const kp=safeDropKeyPos(hit.position,entity,r);
+   r.droppedKeys.push({id:uid(),key:target.key,x:kp.x,z:kp.z,ownerId:p.id,picked:false});
+   event(r,`${p.name} downed the highlighted cock. Its key dropped there — reach it and press E.`);
+  }
+ }else{
+  const wrongBird=!police?rayTarget(origin,dir,r.birds.filter(b=>b.alive&&b.key!==entity.houseId),rangeWorld,r,entity,false,aimTime):null;
+  event(r,wrongBird?`${p.name} aimed at the wrong cock. Follow the green marker for the matching key.`:`${p.name} fired the ${weapon} and missed — center the target in your crosshair and keep a clear line of sight.`);
+ }
+ const muzzle={x:entity.x,y:1.35,z:entity.z},end=hit?hit.impact:impact,traceEnd={x:end.x/WORLD_SCALE+MAP_CENTER,y:end.y,z:end.z/WORLD_SCALE+MAP_CENTER};
+ trace(r,muzzle,traceEnd,police?'police':'thief',traceEnd.y,p.id);
+ finishIfDone(r);
+}
 function handleAction(r,p,msg){if(!r||!p)return;if(msg.action==='assignRole'){if(r.status!=='lobby'||p.id!==r.hostId){send(p.ws,{type:'error',message:'Only the host can assign roles in the lobby.'})}else{const target=r.players.find(x=>x.id===msg.playerId&&x.connected),role=msg.role;if(!target||!['police','thief','unassigned'].includes(role)){send(p.ws,{type:'error',message:'Choose a connected player and a valid role.'})}else{const count=r.players.filter(x=>x.connected&&x.id!==target.id&&x.role===role).length,limit=role==='police'?maxPoliceFor(r.players.filter(x=>x.connected).length):role==='thief'?7:10;if(count>=limit)send(p.ws,{type:'error',message:`A game can have up to ${limit} ${role==='police'?'police officers':'thieves'} at this player count.`});else{target.role=role==='unassigned'?null:role;event(r,`${target.name} ${role==='unassigned'?'needs a team assignment':`assigned ${role==='police'?'to the police':'as a thief'}`}.`);broadcast(r)}}}}
  if(msg.action==='start'){if(p.id!==r.hostId)send(p.ws,{type:'error',message:'Only the host can start the game.'});else if(r.status!=='lobby')send(p.ws,{type:'error',message:'The round is already underway.'});else if(!startGame(r))send(p.ws,{type:'error',message:'Assign every player to a team: 1–3 police and 1–7 thieves, with 2–10 players total.'});else broadcast(r)}
  if(msg.action==='reset'&&r.status==='finished'){r.status='lobby';r.cops=[];r.thieves=[];r.birds=[];r.houses=[];r.droppedKeys=[];r.pedestrians=[];r.matchEndsAt=0;r.players.forEach(x=>{x.role=null;x.alive=true;x.escaped=false;x.place=null});event(r,'A new afternoon is waiting.');broadcast(r)}
@@ -109,7 +323,7 @@ function handleAction(r,p,msg){if(!r||!p)return;if(msg.action==='assignRole'){if
   if(msg.action==='selectWeapon'&&p.role==='police'&&WEAPONS.includes(msg.weapon)){ent.weapon=msg.weapon;broadcast(r)}
   if(msg.action==='reload'){const w=ent.weapon||'rifle';ent.ammo[w]=MAG[w];event(r,`${p.name} reloaded the ${w}.`);broadcast(r)}
   if(msg.action==='shoot'&&(p.role==='police'||ent.alive&&!ent.escaped)){shoot(r,p,ent,msg);broadcast(r)}
-  if(msg.action==='interact'&&p.role==='thief'&&ent.alive&&!ent.escaped){const drop=r.droppedKeys.filter(k=>!k.picked&&k.ownerId===p.id&&distance(ent,k)<1.1).sort((a,b)=>distance(ent,a)-distance(ent,b))[0],house=r.houses.find(h=>h.id===ent.houseId);if(drop){drop.picked=true;if(!ent.keys.includes(drop.key))ent.keys.push(drop.key);ent.escapeDeadline=Math.min(Date.now()+60000,r.matchEndsAt);event(r,`${p.name} picked up the key. Reach your house before the red timer expires.`);broadcast(r)}else if(house&&distance(ent,house)<1.05){if(ent.keys.includes(house.id)){ent.escaped=true;house.unlocked=true;ent.rank=r.thieves.filter(t=>t.escaped).length+1;const pl=r.players.find(x=>x.id===p.id);if(pl){pl.escaped=true;pl.place=ent.rank}event(r,`${p.name} escaped home in place ${ent.rank}.`);finishIfDone(r);broadcast(r)}else send(p.ws,{type:'error',message:r.droppedKeys.some(k=>!k.picked&&k.ownerId===p.id)?'Move close to your dropped key and press E to pick it up.':'Your key has not been picked up yet. Shoot your highlighted cock, then press E beside the dropped key.'})}else send(p.ws,{type:'error',message:ent.keys.includes(ent.houseId)?'Find the green-marked house and press E at its door.':'Move close to your dropped key and press E to pick it up.'})}
+  if(msg.action==='interact'&&p.role==='thief'&&ent.alive&&!ent.escaped){const drop=r.droppedKeys.filter(k=>!k.picked&&k.ownerId===p.id&&distance(ent,k)<1.65).sort((a,b)=>distance(ent,a)-distance(ent,b))[0],house=r.houses.find(h=>h.id===ent.houseId);if(drop){drop.picked=true;if(!ent.keys.includes(drop.key))ent.keys.push(drop.key);ent.escapeDeadline=Math.min(Date.now()+60000,r.matchEndsAt);event(r,`${p.name} picked up the key. Reach your house before the red timer expires.`);broadcast(r)}else if(house&&distance(ent,house)<1.35){if(ent.keys.includes(house.id)){ent.escaped=true;house.unlocked=true;ent.rank=r.thieves.filter(t=>t.escaped).length+1;const pl=r.players.find(x=>x.id===p.id);if(pl){pl.escaped=true;pl.place=ent.rank}event(r,`${p.name} escaped home in place ${ent.rank}.`);finishIfDone(r);broadcast(r)}else send(p.ws,{type:'error',message:r.droppedKeys.some(k=>!k.picked&&k.ownerId===p.id)?'Move close to your dropped key and press E to pick it up.':'Your key has not been picked up yet. Shoot your highlighted cock, then press E beside the dropped key.'})}else send(p.ws,{type:'error',message:ent.keys.includes(ent.houseId)?'Find the green-marked house and press E at its door.':'Move close to your dropped key and press E to pick it up.'})}
  }
 }
 wss.on('connection',ws=>{
