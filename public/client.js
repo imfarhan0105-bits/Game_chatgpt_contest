@@ -1,7 +1,7 @@
 const $=id=>document.getElementById(id),clamp=(v,min,max)=>Math.max(min,Math.min(max,v));let socket,gameState=null,token=sessionStorage.getItem('nocturna-token')||Math.random().toString(36).slice(2),keyState={},lastMove=0,lastFeedAt=0,stateReceivedAt=Date.now();
 sessionStorage.setItem('nocturna-token',token);
 const cityName=map=>map==='paris'?'Paris':map==='muscat'?'Muscat':map==='miami'?'Miami':'Barcelona';
-function connect(){const proto=location.protocol==='https:'?'wss':'ws';socket=new WebSocket(`${proto}://${location.host}`);socket.onopen=()=>{$('netstatus').textContent='CONNECTED';document.querySelector('.live').classList.add('on');};socket.onclose=()=>{$('netstatus').textContent='RECONNECTING';document.querySelector('.live').classList.remove('on');setTimeout(connect,1200)};socket.onmessage=e=>{const m=JSON.parse(e.data);if(m.type==='error'){$('joinError').textContent=m.message;if($('lobbyError'))$('lobbyError').textContent=m.message;if($('gameError')){$('gameError').textContent=m.message;setTimeout(()=>{$('gameError').textContent=''},2400)}return}if(m.type==='state'){gameState=m.room;if(!gameState.map)gameState.map=sessionStorage.getItem('nocturna-map')||'barcelona';stateReceivedAt=Date.now();render()}}}
+function connect(){const defaultProto=location.protocol==='https:'?'wss':'ws';const wsUrl=window.GAME_WS_URL||sessionStorage.getItem('nocturna-ws-url')||`${defaultProto}://${location.host}`;socket=new WebSocket(wsUrl);socket.onopen=()=>{$('netstatus').textContent='CONNECTED';document.querySelector('.live').classList.add('on');};socket.onclose=()=>{$('netstatus').textContent='RECONNECTING';document.querySelector('.live').classList.remove('on');setTimeout(connect,1200)};socket.onmessage=e=>{const m=JSON.parse(e.data);if(m.type==='error'){$('joinError').textContent=m.message;if($('lobbyError'))$('lobbyError').textContent=m.message;if($('gameError')){$('gameError').textContent=m.message;setTimeout(()=>{$('gameError').textContent=''},2400)}return}if(m.type==='state'){gameState=m.room;if(!gameState.map)gameState.map=sessionStorage.getItem('nocturna-map')||'barcelona';stateReceivedAt=Date.now();render()}}}
 connect();function send(obj){if(socket?.readyState===1)socket.send(JSON.stringify(obj))}
 function enterRoom(code){const name=$('name').value.trim()||'Runner',map=$('mapSelect').value;sessionStorage.setItem('nocturna-map',map);$('joinError').textContent='';send({type:'join',code,name,token,map})}
 $('joinBtn').onclick=()=>{const code=$('code').value.trim().toUpperCase();if(!code){$('joinError').textContent='Enter a room code, or create a random room.';return}enterRoom(code)};$('code').onkeydown=e=>{if(e.key==='Enter')$('joinBtn').click()};$('randomRoomBtn').onclick=()=>{const name=$('name').value.trim()||'Runner',map=$('mapSelect').value;sessionStorage.setItem('nocturna-map',map);$('joinError').textContent='';send({type:'createRoom',name,token,map})};$('startBtn').onclick=()=>send({type:'action',action:'start'});
@@ -448,6 +448,8 @@ function frame3D(now=0){
  if(storm3d&&gameState?.map==='muscat'){const positions=storm3d.geometry.attributes.position.array,{vx,vz}=storm3d.userData;for(let i=0;i<vx.length;i++){const k=i*3;positions[k]+=vx[i]*dt;positions[k+2]+=vz[i]*dt;if(positions[k]>59){positions[k]=-59;positions[k+2]=(Math.random()-.5)*116;positions[k+1]=Math.random()*15+.2}if(positions[k+2]>59)positions[k+2]=-59}storm3d.geometry.attributes.position.needsUpdate=true;}
  if(snow3d&&gameState?.map==='paris'){const positions=snow3d.geometry.attributes.position.array,{speed,driftX,driftZ}=snow3d.userData;for(let i=0;i<speed.length;i++){const k=i*3;positions[k+1]-=speed[i]*dt;positions[k]+=driftX[i]*dt;positions[k+2]+=driftZ[i]*dt;if(positions[k+1]<0){positions[k]=(Math.random()-.5)*112;positions[k+1]=54+Math.random()*8;positions[k+2]=(Math.random()-.5)*112}}snow3d.geometry.attributes.position.needsUpdate=true;}
  for(const [id,model]of actors3d){if(id.startsWith('house:')||id.startsWith('shot:')||id.startsWith('keydrop:'))continue;
+  const inputMove=!!(keyState.w||keyState.W||keyState.s||keyState.S||keyState.a||keyState.A||keyState.d||keyState.D||keyState.ArrowUp||keyState.ArrowDown||keyState.ArrowLeft||keyState.ArrowRight),
+        moving=Date.now()<(model.userData.walkingUntil||0)||(model.userData.local&&inputMove);
   if(model.userData.local){
    const me=gameState?.players.find(p=>p.id===gameState.selfId);
    if(me&&me.alive!==false&&!me.escaped){
@@ -491,8 +493,6 @@ function frame3D(now=0){
    const delta=Math.atan2(Math.sin(model.userData.targetYaw-model.rotation.y),Math.cos(model.userData.targetYaw-model.rotation.y));
    model.rotation.y+=delta*Math.min(1,Math.max(dt*14,1-Math.exp(-dt*18)));
   }
-  const inputMove=!!(keyState.w||keyState.W||keyState.s||keyState.S||keyState.a||keyState.A||keyState.d||keyState.D||keyState.ArrowUp||keyState.ArrowDown||keyState.ArrowLeft||keyState.ArrowRight),
-        moving=Date.now()<(model.userData.walkingUntil||0)||(model.userData.local&&inputMove);
   if(model.userData.legs){
    const swing=moving?Math.sin(now*.011)*.44:0;
    for(let i=0;i<model.userData.legs.length;i++){
