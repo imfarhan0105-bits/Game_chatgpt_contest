@@ -31,9 +31,64 @@ function ensure3D(){
  const T=window.THREE,muscat=gameState?.map==='muscat',miami=gameState?.map==='miami';scene3d=new T.Scene();scene3d.background=new T.Color(muscat?'#b49c78':miami?'#79bfd1':'#101827');scene3d.fog=new T.Fog(muscat?'#b49c78':miami?'#79bfd1':'#172235',muscat?12:miami?95:74,muscat?58:miami?190:198);
  cam3d=new T.PerspectiveCamera(68,1,.1,160);renderer3d=new T.WebGLRenderer({canvas,antialias:true,alpha:false});renderer3d.setPixelRatio(Math.min(devicePixelRatio,1.25));renderer3d.shadowMap.enabled=true;renderer3d.shadowMap.type=T.PCFShadowMap;renderer3d.outputColorSpace=T.SRGBColorSpace;renderer3d.toneMapping=T.ACESFilmicToneMapping;renderer3d.toneMappingExposure=1.08;
  world3d=new T.Group();scene3d.add(world3d);scene3d.add(new T.HemisphereLight(muscat?0xffe3b5:miami?0xc5f2ff:0x9bb7e1,muscat?0x493826:miami?0x536b58:0x26232b,muscat?2:miami?2.1:1.35));const moon=new T.DirectionalLight(muscat?0xffd196:miami?0xffe1ad:0x9bb8e7,muscat?3:miami?3:2.6);moon.position.set(-42,58,26);moon.castShadow=true;moon.shadow.mapSize.set(1024,1024);moon.shadow.camera.left=-85;moon.shadow.camera.right=85;moon.shadow.camera.top=85;moon.shadow.camera.bottom=-85;scene3d.add(moon);makeCity();resize3D();window.addEventListener('resize',resize3D);
- canvas.addEventListener('click',()=>{audio();if(innerWidth>660&&!mouseLocked&&canvas.requestPointerLock)canvas.requestPointerLock()});document.addEventListener('pointerlockchange',()=>{mouseLocked=document.pointerLockElement===canvas;const me=gameState?.players.find(p=>p.id===gameState.selfId);if(me?.role==='police'){lastMouseX=null;lastMouseY=null}document.body.classList.toggle('mouse-locked',mouseLocked);$('look-hint').textContent=mouseLocked?'MOUSE AIM · 360° LOOK · ESC RELEASE':me?.role==='police'?'MOVE CURSOR TO STEER · CLICK SCENE FOR 360° AIM':'CLICK SCENE · HOLD RMB TO AIM 360°'});
- document.addEventListener('mousemove',e=>{const me=gameState?.players.find(p=>p.id===gameState.selfId),policeCursor=gameState?.status==='playing'&&me?.role==='police';if(!mouseLocked&&!aiming&&!policeCursor){lastMouseX=e.clientX;lastMouseY=e.clientY;return}const dx=mouseLocked?e.movementX:(lastMouseX==null?0:e.clientX-lastMouseX),dy=mouseLocked?e.movementY:(lastMouseY==null?0:e.clientY-lastMouseY);lastMouseX=e.clientX;lastMouseY=e.clientY;const sensitivity=.0017;cameraYaw-=dx*sensitivity;cameraPitch=THREE.MathUtils.clamp(cameraPitch-dy*sensitivity,-1.5,1.5);if((dx||dy)&&gameState?.status==='playing'&&Date.now()-lastLookSent>70){send({type:'action',action:'look',yaw:cameraYaw});lastLookSent=Date.now()}});
- canvas.addEventListener('contextmenu',e=>e.preventDefault());canvas.addEventListener('mousedown',e=>{audio();if(e.button===2){aiming=true;updateAimClasses();if(innerWidth>660&&!mouseLocked&&canvas.requestPointerLock)canvas.requestPointerLock()}});window.addEventListener('mouseup',e=>{if(e.button===2){aiming=false;updateAimClasses()}if(e.button===0)setFireSource('mouse',false)});
+ function requestGameLock(){
+  audio();
+  if(gameState?.status==='playing'&&!mouseLocked){
+   const target=canvas||document.querySelector('.map-wrap');
+   if(target&&target.requestPointerLock){
+    try{target.requestPointerLock()}catch(_){}
+   }
+  }
+ }
+ canvas.addEventListener('click',requestGameLock);
+ canvas.addEventListener('pointerdown',requestGameLock);
+ canvas.addEventListener('mousedown',requestGameLock);
+ const mapWrap=document.querySelector('.map-wrap');
+ if(mapWrap){
+  mapWrap.addEventListener('click',requestGameLock);
+  mapWrap.addEventListener('pointerdown',requestGameLock);
+  mapWrap.addEventListener('mousedown',requestGameLock);
+ }
+ document.addEventListener('pointerlockchange',()=>{
+  mouseLocked=document.pointerLockElement===canvas||document.pointerLockElement===mapWrap;
+  document.body.classList.toggle('mouse-locked',mouseLocked);
+  const me=gameState?.players.find(p=>p.id===gameState.selfId);
+  $('look-hint').textContent=mouseLocked?'MOUSE AIM · 360° FREEDOM · ESC TO RELEASE':me?.role==='police'?'MOVE CURSOR TO STEER 360° · CLICK TO LOCK AIM':'CLICK SCENE · HOLD RMB TO AIM 360°';
+ });
+ document.addEventListener('mousemove',e=>{
+  const me=gameState?.players.find(p=>p.id===gameState.selfId),
+        playing=gameState?.status==='playing';
+  if(!playing)return;
+  if(mouseLocked){
+   const sensitivity=0.0022;
+   cameraYaw-=e.movementX*sensitivity;
+   cameraPitch=clamp(cameraPitch-e.movementY*sensitivity,-1.3,1.3);
+  }else if(me?.role==='police'||aiming){
+   const rect=canvas.getBoundingClientRect();
+   const cx=rect.left+rect.width/2,cy=rect.top+rect.height/2;
+   const dx=e.clientX-cx,dy=e.clientY-cy;
+   if(Math.hypot(dx,dy)>6){
+    cameraYaw=Math.atan2(-dx,-dy);
+   }
+   cameraPitch=clamp(-dy/(rect.height*0.45)*0.65,-1.2,1.2);
+  }
+  while(cameraYaw>Math.PI)cameraYaw-=Math.PI*2;
+  while(cameraYaw<-Math.PI)cameraYaw+=Math.PI*2;
+  if(Date.now()-lastLookSent>50){
+   send({type:'action',action:'look',yaw:cameraYaw});
+   lastLookSent=Date.now();
+  }
+ });
+ canvas.addEventListener('contextmenu',e=>e.preventDefault());
+ canvas.addEventListener('mousedown',e=>{
+  audio();
+  requestGameLock();
+  if(e.button===2){aiming=true;updateAimClasses()}
+ });
+ window.addEventListener('mouseup',e=>{
+  if(e.button===2){aiming=false;updateAimClasses()}
+  if(e.button===0)setFireSource('mouse',false);
+ });
  requestAnimationFrame(frame3D)
 }
 function resize3D(){if(!renderer3d)return;const r=$('mapCanvas').getBoundingClientRect();renderer3d.setSize(r.width,r.height,false);cam3d.aspect=r.width/Math.max(1,r.height);cam3d.updateProjectionMatrix()}
@@ -222,10 +277,10 @@ function setActorTarget(model,x,z,yaw,backwards=false,local=false){
   model.userData.targetPosition.copy(target);
  }
  if(!local){
-  model.userData.targetYaw=yaw+Math.PI+(backwards?Math.PI:0);
+  model.userData.targetYaw=yaw+Math.PI;
  }
  model.userData.backwards=backwards;
- if(model.userData.gun)model.userData.gun.rotation.y=local?currentViewYaw()-yaw:0;
+ if(model.userData.gun)model.userData.gun.rotation.set(0,0,0);
 }
 const seenShots=new Set();
 function makeTracerMesh(shot){
@@ -352,9 +407,7 @@ function frame3D(now=0){
      model.position.lerp(model.userData.targetPosition,1-Math.exp(-dt*12));
     }
    }
-   const actor=selfActor();
-   const backwards=!!(actor?.backwards);
-   model.userData.targetYaw=currentViewYaw()+Math.PI+(backwards?Math.PI:0);
+   model.userData.targetYaw=currentViewYaw()+Math.PI;
   }else if(model.userData.targetPosition){
    const dist=model.position.distanceTo(model.userData.targetPosition);
    if(dist>12){
@@ -384,8 +437,7 @@ function frame3D(now=0){
   if(model.userData.gun){
    model.userData.recoil=Math.max(0,(model.userData.recoil||0)-dt*.8);
    model.userData.gun.position.z=-.2-model.userData.recoil;
-   const actor=selfActor();
-   model.userData.gun.rotation.set(-cameraPitch,model.userData.local?cameraYaw-(actor?.yaw||0):0,0);
+   model.userData.gun.rotation.set(-cameraPitch,0,0);
   }
  }
  const nowMs=performance.now();
