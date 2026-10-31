@@ -1,0 +1,155 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+  <meta name="theme-color" content="#0b1114">
+  <title>Current Map — Barcelona City</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <div class="grain" aria-hidden="true"></div>
+  <main class="shell">
+    <header class="topbar">
+      <a class="brand" id="brandLink" href="#" aria-label="Current Map — Barcelona City">
+        <span class="brand-mark" aria-hidden="true">✳</span>
+        <span>CURRENT MAP<small id="mapBrand">BARCELONA CITY</small></span>
+      </a>
+      <div class="live"><i aria-hidden="true"></i><span id="netstatus">CONNECTING</span></div>
+    </header>
+
+    <section id="landing" class="landing">
+      <div class="hero-copy">
+        <div class="eyebrow"><span>01</span> THE CITY AFTER DARK</div>
+        <h1>Take the<br><em>backstreets.</em></h1>
+        <p class="intro">A midnight maze of alleys. Seven roaming keys. One safe way home.</p>
+        <div class="join-card">
+          <label for="mapSelect">SELECT CITY MAP</label>
+          <select id="mapSelect" class="map-select"><option value="barcelona">Barcelona</option><option value="paris">Paris</option><option value="muscat">Muscat</option><option value="miami">Miami</option></select>
+          <label for="name">YOUR CALLSIGN</label>
+          <input id="name" maxlength="18" placeholder="e.g. La Sombra" autocomplete="nickname">
+          <label for="code">ROOM CODE</label>
+          <div class="join-line">
+            <input id="code" maxlength="8" placeholder="XXXXX" autocomplete="off" aria-label="Room code">
+            <button id="joinBtn" class="button button-cream">ENTER CITY <b aria-hidden="true">↗</b></button>
+          </div>
+          <button id="randomRoomBtn" class="button button-line random-room-button">CREATE RANDOM ROOM · 5 LETTERS</button>
+          <div id="joinError" class="error" role="status" aria-live="polite"></div>
+          <div class="tiny-note">2—10 PLAYERS <span>·</span> NO ACCOUNT NEEDED</div>
+        </div>
+        <div class="howto" aria-label="How to play">
+          <div><b>01</b><span>Shoot your marked cock<br>then press E at its key</span></div>
+          <div><b>02</b><span>Lose the police<br>in the grid</span></div>
+          <div><b>03</b><span>Reach your house<br>before the timer ends</span></div>
+        </div>
+      </div>
+      <div class="hero-art">
+        <div class="sun" aria-hidden="true"></div>
+        <div class="art-label label-top">CURRENT MAP <span>BARCELONA CITY</span></div>
+        <svg class="city-art" viewBox="0 0 660 780" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Barcelona rooftops at night">
+          <defs>
+            <linearGradient id="sky" x2="0" y2="1"><stop stop-color="#13232b"/><stop offset="1" stop-color="#0b1115"/></linearGradient>
+            <pattern id="windows" width="21" height="28" patternUnits="userSpaceOnUse">
+              <rect x="4" y="5" width="5" height="9" fill="#d4a974" opacity=".65"/><rect x="13" y="5" width="5" height="9" fill="#355158"/><rect x="4" y="20" width="5" height="5" fill="#42575a"/><rect x="13" y="20" width="5" height="5" fill="#c9895c" opacity=".55"/>
+            </pattern>
+          </defs>
+          <rect width="660" height="780" fill="url(#sky)"/>
+          <g fill="#283a3c" stroke="#52615c" stroke-width="2">
+            <path d="M-30 198 170 152l15 524-215 42z"/><path d="m188 160 177-21 7 543-169 8z"/><path d="m383 140 174 37 18 501-190 0z"/><path d="m576 180 117 43v449l-95 10z"/>
+          </g>
+          <g fill="url(#windows)">
+            <path d="M-25 203 165 164l12 492-202 36z"/><path d="m194 170 164-21 7 514-157 3z"/><path d="m391 149 160 34 17 482-176 0z"/><path d="m582 190 104 37v436l-83 8z"/>
+          </g>
+          <g fill="#b17857"><path d="m-31 198 202-49 5 16-203 48z"/><path d="m185 159 180-25 1 15-178 27z"/><path d="m380 136 179 39-3 15-179-39z"/><path d="m575 177 121 44-5 13-118-41z"/></g>
+          <g fill="#172326" stroke="#b78058" stroke-width="3"><path d="M56 638v-88a28 28 0 0 1 56 0v78z"/><path d="M254 673V565a30 30 0 0 1 60 0v105z"/><path d="M440 642v-95a30 30 0 0 1 60 0v95z"/></g>
+          <path d="M0 681h660v99H0z" fill="#10191b"/><path d="M0 681h660" stroke="#b58058" stroke-width="2"/>
+          <path d="M126 684v96m125-96v96m126-96v96m126-96v96" stroke="#394548" stroke-width="2"/>
+          <path d="M294 728c10-15 17-21 26-10 8-11 18-5 25 10l-5 8h-42z" fill="#d9d6b6" stroke="#724933" stroke-width="2"/>
+          <circle cx="326" cy="708" r="3" fill="#d9d6b6"/><path d="m326 704 5-7 4 6" fill="#cf925f"/>
+          <text x="20" y="755" fill="#d5bc9b" font-size="11" letter-spacing="3">CARRER DE MALLORCA</text><text x="535" y="755" fill="#d5bc9b" font-size="11" letter-spacing="2">00:47</text>
+        </svg>
+        <svg class="paris-art" viewBox="0 0 660 780" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Paris rooftops and the Eiffel Tower at night">
+          <defs><linearGradient id="parisSky" x2="0" y2="1"><stop stop-color="#172a39"/><stop offset="1" stop-color="#0b1115"/></linearGradient><pattern id="parisWindows" width="25" height="32" patternUnits="userSpaceOnUse"><rect x="7" y="5" width="11" height="21" rx="5.5" fill="#d9bb89" opacity=".7"/><path d="M12.5 5v21" stroke="#4a4c4a"/><path d="M4 27h17" stroke="#c6b18b" stroke-width="2"/></pattern></defs>
+          <rect width="660" height="780" fill="url(#parisSky)"/><circle cx="440" cy="160" r="92" fill="#d8cbaa" opacity=".11"/>
+          <g fill="#4a4b49" stroke="#8a806d" stroke-width="2"><path d="M-28 248 170 213v466H-28z"/><path d="m180 222 160-31 20 488-180 0z"/><path d="m365 190 170 28 22 461-190 0z"/><path d="m550 220 140 35v430H550z"/></g>
+          <g fill="url(#parisWindows)"><path d="M-20 260 163 229v427H-20z"/><path d="m189 230 143-28 17 459-162 0z"/><path d="m374 201 151 25 19 431H384z"/><path d="m559 232 122 31v394H559z"/></g>
+          <g fill="#39434a" stroke="#b69c72" stroke-width="4"><path d="M-30 248v-20l24-30 78 4 44-31 69 22 45-28 48 12 48-26 76 26 52-11 70 23 61-5 73 27v25z"/></g>
+          <g fill="#d2b477" stroke="#d2b477" stroke-linejoin="round"><path d="M250 666h160l-39-128-12-105-10-107-7-106-6-75-6 75-7 106-10 107-12 105z"/><path d="M271 652 303 535 314 430 322 323 327 220 330 154 333 220 338 323 346 430 357 535 389 652z" fill="#263540" stroke="none"/><path d="M249 661h162v12H249zM291 527h78v11h-78zM304 421h52v10h-52zM314 315h32v9h-32zM319 211h22v8h-22zM320 152h20v8h-20z"/><path d="m278 647 78-111m-52 0 61-105m-51 0 47-107m-37 0 33-106m-22 0 19-60M382 647l-78-111m52 0-61-105m51 0-47-107m37 0-33-106m22 0-19-60" fill="none" stroke-width="7"/><path d="M326 151h8l5-34h-18z"/></g><path d="M0 679h660v101H0z" fill="#10191b"/><path d="M0 679h660" stroke="#b7a178" stroke-width="2"/><text x="28" y="730" fill="#b7a178" font-family="monospace" font-size="10" letter-spacing="2">LA VILLE LUMIÈRE</text>
+        </svg>
+        <svg class="muscat-art" viewBox="0 0 660 780" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Muscat at dusk, with a great desert tent under blowing sand">
+          <defs><linearGradient id="muscatSky" x2="0" y2="1"><stop stop-color="#c6a878"/><stop offset=".58" stop-color="#85694d"/><stop offset="1" stop-color="#342a22"/></linearGradient><linearGradient id="tentCloth" x2="0" y2="1"><stop stop-color="#ead9b5"/><stop offset="1" stop-color="#a88050"/></linearGradient><pattern id="muscatWindows" width="30" height="35" patternUnits="userSpaceOnUse"><path d="M8 31V14a7 7 0 0 1 14 0v17z" fill="#27363a"/><path d="M6 31h18" stroke="#d2b98c" stroke-width="2"/><path d="M15 8v23" stroke="#8f795a"/></pattern></defs>
+          <rect width="660" height="780" fill="url(#muscatSky)"/><circle cx="482" cy="165" r="104" fill="#f4dca8" opacity=".25"/><path d="M0 550q90-55 186 0t186-2 288 0v232H0z" fill="#8d704c"/><path d="M0 630q110-52 220 0t220-3 220 4v149H0z" fill="#68513a"/>
+          <g fill="#c9b58f" stroke="#79654a" stroke-width="3"><path d="M-30 384h143v230H-30zM121 343h134v273H121zM405 350h136v264H405zM548 389h142v224H548z"/><path d="M-10 365h46v-50h42v50h38v249H-10zM138 324h42v-58h50v58h38v292H138zM421 330h42v-53h46v53h45v284H421zM564 370h42v-46h44v46h32v243h-118z" fill="#77664f"/></g>
+          <g fill="url(#muscatWindows)"><path d="M-20 403h123v204H-20zM130 364h116v240H130zM414 368h119v238H414zM559 408h121v199H559z"/></g>
+          <g fill="#d5c29e" stroke="#72583c" stroke-width="3"><path d="m-35 382 80-38 74 38v17H-35zM112 341l80-39 76 39v18H112zM395 348l80-38 78 38v18H395zM538 386l80-40 118 40v18H538z"/></g>
+          <g opacity=".95"><path d="M212 592 267 376 329 232 393 376 448 592z" fill="url(#tentCloth)" stroke="#6f4e31" stroke-width="5"/><path d="M267 376 329 232 331 592 212 592z" fill="#b45e3e" opacity=".78"/><path d="m329 232 64 144 55 216H331z" fill="#e4cfaa"/><path d="m267 376 126 0M238 482h185M212 592h236" fill="none" stroke="#8b5d39" stroke-width="8"/><path d="m211 592 118-360 119 360M244 480h174" fill="none" stroke="#60462e" stroke-width="5"/><path d="M318 232 329 202l12 30" fill="#f1dfb9" stroke="#60462e" stroke-width="4"/></g>
+          <g fill="#e7d7b7" stroke="#71573c" stroke-width="2"><path d="M64 612V560a25 25 0 0 1 50 0v52zM144 616v-67a23 23 0 0 1 46 0v67zM477 612v-67a23 23 0 0 1 46 0v67zM558 610v-52a25 25 0 0 1 50 0v52z"/></g>
+          <path d="M0 665q95-41 190 0t190-1 280 0v116H0z" fill="#49392a"/><g fill="#e7c989" opacity=".45"><circle cx="92" cy="236" r="3"/><circle cx="169" cy="197" r="2"/><circle cx="514" cy="289" r="3"/><circle cx="584" cy="246" r="2"/><circle cx="80" cy="470" r="2"/><circle cx="575" cy="490" r="2"/><circle cx="137" cy="285" r="3"/><circle cx="524" cy="215" r="2"/></g>
+          <text x="24" y="738" fill="#dfcba7" font-family="monospace" font-size="11" letter-spacing="3">MUSCAT · DESERT WIND</text>
+        </svg>
+        <svg class="miami-art" viewBox="0 0 660 780" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Miami Beach Art Deco hotels beside turquoise water">
+          <defs><linearGradient id="miamiSky" x2="0" y2="1"><stop stop-color="#54b7d0"/><stop offset=".62" stop-color="#f2c18c"/><stop offset="1" stop-color="#f1a979"/></linearGradient><pattern id="miamiWindows" width="25" height="34" patternUnits="userSpaceOnUse"><rect x="7" y="5" width="11" height="22" rx="5.5" fill="#31596a"/><path d="M5 28h15" stroke="#f4dcba" stroke-width="3"/></pattern></defs>
+          <rect width="660" height="780" fill="url(#miamiSky)"/><circle cx="500" cy="164" r="85" fill="#fff0c5" opacity=".65"/><path d="M0 523h660v257H0z" fill="#3daab3"/><path d="M0 574q120-24 240 0t240 0 180 0v206H0z" fill="#57c0bf"/><path d="M0 640q120-20 240 0t240 0 180 0v140H0z" fill="#ead0a3"/>
+          <g stroke="#c77c79" stroke-width="3"><path d="M-25 368h150v226H-25z" fill="#f3c4a1"/><path d="M130 309h146v286H130z" fill="#8ec3bd"/><path d="M390 330h143v264H390z" fill="#f4b5a0"/><path d="M540 378h148v216H540z" fill="#f0d19e"/></g><g fill="url(#miamiWindows)"><path d="M-15 390h130v191H-15zM141 333h124v248H141zM401 351h122v230H401zM550 399h128v182H550z"/></g>
+          <path d="M-25 368h150v-25h-47v-24h-42v24h-61zM130 309h146v-31h-43v-44h-56v44h-47zM390 330h143v-28h-42v-37h-51v37h-50zM540 378h148v-26h-46v-34h-49v34h-53z" fill="#f6dfbb" stroke="#c77c79" stroke-width="3"/><g fill="#f9e0ae"><path d="M80 594q14-53 29 0M303 594q13-68 28 0M570 594q13-54 27 0"/></g><path d="M0 694h660v86H0z" fill="#e3bb8b"/><path d="M0 694h660" stroke="#fff0ce" stroke-width="5"/><path d="M22 733h616" stroke="#a67e65" stroke-width="2" stroke-dasharray="12 11"/><g fill="#ec795e"><path d="M205 675q3-54 31-80 25 27 28 80zM211 593q-25-30-50-32 10 30 43 40M230 588q8-34 29-49 6 30-16 55"/><path d="M445 679q3-48 25-71 23 25 26 71zM451 608q-24-28-44-29 7 27 38 38M470 605q6-30 25-43 6 26-14 48"/></g><text x="26" y="752" fill="#775e56" font-family="monospace" font-size="11" letter-spacing="3">OCEAN DRIVE · MIAMI BEACH</text>
+        </svg>
+        <div class="art-label label-bottom">A CITY BUILT TO GET LOST IN <span>✦</span></div>
+      </div>
+    </section>
+
+    <section id="game" class="game hidden" aria-live="polite">
+      <div class="game-head">
+        <div><div class="eyebrow"><span id="roomCodeLabel">ROOM —</span> <span id="stateLabel">WAITING ROOM</span> <span id="roomMapLabel">BARCELONA</span></div><h2 id="gameTitle">The gathering.</h2></div>
+        <div class="players-count"><b id="playerCount">0</b><span>IN THE CITY</span></div>
+      </div>
+      <div id="lobby" class="lobby">
+        <div class="roster-panel">
+          <div class="section-title">THE GUEST LIST <span id="capacity">0 / 10</span></div>
+          <div id="teamSummary" class="team-summary"></div>
+          <div id="roster" class="roster"></div>
+          <div class="lobby-actions"><button id="startBtn" class="button button-cream">START THE CHASE <b aria-hidden="true">↗</b></button></div>
+          <div id="lobbyError" class="error" role="status" aria-live="polite"></div>
+          <div id="teamCapNote" class="tiny-note lobby-panel-note">The host assigns teams and starts the round.</div>
+        </div>
+        <div class="lobby-note">
+          <div class="note-icon" aria-hidden="true">✳</div><div class="eyebrow">HOW TO PLAY · READ WHILE YOU WAIT</div>
+          <p class="lobby-summary">The match lasts 3 minutes. Thieves race for their keys and homes; police must stop them before time runs out.</p>
+          <div class="lobby-instructions">
+            <section><b>THIEVES</b><span>Follow your green marker and shoot only your marked cock. Its key drops where it falls. Go there and press <strong>E</strong> to pick it up, then reach your green-marked house within 60 seconds—or the remaining match time if shorter.</span></section>
+            <section><b>POLICE</b><span>Move your cursor to face and steer. Catch thieves before the 3-minute match timer ends.</span></section>
+            <section><b>CONTROLS</b><span><strong>W/S</strong> forward/back along aim · <strong>A/D</strong> strafe · <strong>Shift</strong> run · <strong>Mouse</strong> aim · <strong>Right-click</strong> scope · <strong>Left-click / Left Ctrl</strong> fire · <strong>R</strong> reload · <strong>Scroll / 1–3</strong> police weapons · <strong>E</strong> pick up key / enter house.</span></section>
+          </div>
+          <span>THE HOST ASSIGNS ROLES AND STARTS THE MATCH</span>
+        </div>
+      </div>
+      <div id="arena" class="arena hidden">
+        <div class="map-wrap" aria-label="Third-person 3D game scene">
+          <canvas id="mapCanvas" width="960" height="720" aria-label="3D Barcelona street scene"></canvas>
+          <div class="map-tag"><span id="mapTagCity">BARCELONA CITY MAP</span> <span>MOUSE AIM 360° · W/S FORWARD/BACK · A/D STRAFE · RMB SCOPE · LMB / LEFT CTRL FIRE</span></div>
+          <div id="gameError" class="game-error" role="status" aria-live="polite"></div>
+          <div id="roleBadge" class="role-badge"></div>
+          <div id="matchClock" class="match-clock hidden" aria-live="off"><span>ROUND <b id="matchTime">03:00</b></span><span id="escapeClock" class="escape-clock hidden">GET HOME <b id="escapeTime">01:00</b></span></div>
+          <div class="crosshair" aria-hidden="true"><i></i><i></i><b>·</b></div>
+          <div id="hitMarker" class="hit-marker" aria-hidden="true">×</div>
+          <div id="scopeOverlay" class="scope-overlay" aria-hidden="true"><i></i></div>
+          <div id="weaponHud" class="weapon-hud hidden"><span id="weaponName">RIFLE</span><b id="ammoCount">30 / ∞</b><small id="weaponHint">R TO RELOAD</small><small id="scopePower" class="scope-power"></small></div>
+          <div class="minimap-wrap" aria-label="Live map showing every player and officer"><canvas id="minimapCanvas" width="192" height="192"></canvas><div class="minimap-legend"><span><i class="cop-dot"></i>POLICE</span><span><i class="thief-dot"></i>THIEF</span></div></div>
+          <div id="look-hint" class="look-hint">CLICK SCENE · MOUSE AIM 360° · HOLD RMB TO SCOPE</div>
+        </div>
+        <aside class="side-panel">
+          <div class="section-title">YOUR OBJECTIVE</div><div id="objective" class="objective"></div>
+          <div class="control-help"><b>MOVE</b><span>W/S FORWARD/BACK · A/D STRAFE · SHIFT RUN</span><b>AIM</b><span>MOUSE 360° · HOLD RIGHT CLICK TO SCOPE</span><b>FIRE</b><span>HOLD LEFT CLICK / LEFT CTRL</span><b>GUNS</b><span>SCROLL · 1 / 2 / 3</span><b>RELOAD</b><span>R</span><b>USE</b><span>E / INTERACT</span></div>
+          <div class="section-title feed-title">CITY RADIO</div><div id="feed" class="feed"></div><button id="leaveBtn" class="button button-line">LEAVE ROUND</button>
+        </aside>
+        <div class="mobile-controls" aria-label="Touch game controls">
+          <div class="dpad"><button data-dir="up" aria-label="Move forward">▲</button><button data-dir="left" aria-label="Move left">◀</button><button data-dir="down" aria-label="Move backward">▼</button><button data-dir="right" aria-label="Move right">▶</button></div>
+          <button id="actionBtn">FIRE</button><button id="interactBtn">USE</button>
+        </div>
+      </div>
+      <div id="results" class="results hidden"><div class="eyebrow">THE CITY REMEMBERS</div><h2>Night's over.</h2><div id="resultText"></div><div id="leaderboard" class="leaderboard"></div><button id="againBtn" class="button button-cream">BACK TO LOBBY <b aria-hidden="true">↗</b></button></div>
+    </section>
+    <footer><span><span id="footerCity">BARCELONA CITY PURSUIT</span> <i>—</i> A CITY GAME</span><span>AFTER DARK <b aria-hidden="true">✳</b></span></footer>
+  </main>
+  <script type="module">import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.module.js'; window.THREE=THREE; await import('/client.js');</script>
+</body>
+</html>

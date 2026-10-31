@@ -1,0 +1,3 @@
+Animated human character: Soldier.glb from the official three.js examples, distributed with the three.js project license. It is recolored in game for the police and thief teams.
+Source: https://threejs.org/examples/models/gltf/Soldier.glb
+License: see THREE-MIT-LICENSE.txt
