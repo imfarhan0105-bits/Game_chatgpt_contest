@@ -1,7 +1,33 @@
 const $=id=>document.getElementById(id),clamp=(v,min,max)=>Math.max(min,Math.min(max,v));let socket,gameState=null,token=sessionStorage.getItem('nocturna-token')||Math.random().toString(36).slice(2),keyState={},lastMove=0,lastFeedAt=0,stateReceivedAt=Date.now();
 sessionStorage.setItem('nocturna-token',token);
 const cityName=map=>map==='paris'?'Paris':map==='muscat'?'Muscat':map==='miami'?'Miami':'Barcelona';
-function connect(){const proto=location.protocol==='https:'?'wss':'ws';socket=new WebSocket(`${proto}://${location.host}`);socket.onopen=()=>{$('netstatus').textContent='CONNECTED';document.querySelector('.live').classList.add('on');};socket.onclose=()=>{$('netstatus').textContent='RECONNECTING';document.querySelector('.live').classList.remove('on');setTimeout(connect,1200)};socket.onmessage=e=>{const m=JSON.parse(e.data);if(m.type==='error'){$('joinError').textContent=m.message;if($('lobbyError'))$('lobbyError').textContent=m.message;if($('gameError')){$('gameError').textContent=m.message;setTimeout(()=>{$('gameError').textContent=''},2400)}return}if(m.type==='state'){gameState=m.room;if(!gameState.map)gameState.map=sessionStorage.getItem('nocturna-map')||'barcelona';stateReceivedAt=Date.now();render()}}}
+function connect(){
+  socket = new WebSocket('wss://game-chatgpt-contest.onrender.com');
+  socket.onopen=()=>{
+    $('netstatus').textContent='CONNECTED';
+    document.querySelector('.live').classList.add('on');
+  };
+  socket.onclose=()=>{
+    $('netstatus').textContent='RECONNECTING';
+    document.querySelector('.live').classList.remove('on');
+    setTimeout(connect,1200);
+  };
+  socket.onmessage=e=>{
+    const m=JSON.parse(e.data);
+    if(m.type==='error'){
+      $('joinError').textContent=m.message;
+      if($('lobbyError'))$('lobbyError').textContent=m.message;
+      if($('gameError')){$('gameError').textContent=m.message;setTimeout(()=>{$('gameError').textContent=''},2400)}
+      return;
+    }
+    if(m.type==='state'){
+      gameState=m.room;
+      if(!gameState.map)gameState.map=sessionStorage.getItem('nocturna-map')||'barcelona';
+      stateReceivedAt=Date.now();
+      render();
+    }
+  };
+}
 connect();function send(obj){if(socket?.readyState===1)socket.send(JSON.stringify(obj))}
 function enterRoom(code){const name=$('name').value.trim()||'Runner',map=$('mapSelect').value;sessionStorage.setItem('nocturna-map',map);$('joinError').textContent='';send({type:'join',code,name,token,map})}
 $('joinBtn').onclick=()=>{const code=$('code').value.trim().toUpperCase();if(!code){$('joinError').textContent='Enter a room code, or create a random room.';return}enterRoom(code)};$('code').onkeydown=e=>{if(e.key==='Enter')$('joinBtn').click()};$('randomRoomBtn').onclick=()=>{const name=$('name').value.trim()||'Runner',map=$('mapSelect').value;sessionStorage.setItem('nocturna-map',map);$('joinError').textContent='';send({type:'createRoom',name,token,map})};$('startBtn').onclick=()=>send({type:'action',action:'start'});
